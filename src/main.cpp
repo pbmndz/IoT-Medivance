@@ -122,8 +122,9 @@ void selectMuxChannel(int channel) {
 bool channel0() {
     selectMuxChannel(0);
     int analogValue = analogRead(SIG);
-    if(analogValue > 300){
-      return true;
+    return analogValue;
+    if(analogValue > 350){
+      
     } else{
       return false;
     }
@@ -131,9 +132,8 @@ bool channel0() {
 
 
 void loop() {
+  int value0 = channel0();
 
-  oled.setCursor(0, 10);       
-  oled.println("good day! "); 
   oled.setCursor(0, 20);       
   oled.println("welcome / user"); 
   oled.setCursor(0, 30);       
@@ -143,7 +143,7 @@ void loop() {
   oled.display();   
 
 
-  if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 500 || sendDataPrevMillis == 0)){
+  if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0)){
     sendDataPrevMillis = millis();
 
     int value0 = channel0();
