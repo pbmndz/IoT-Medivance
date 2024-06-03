@@ -6,11 +6,10 @@
 #include <Adafruit_SSD1306.h>
 #include <U8g2lib.h>
 #include "ani.h"
+#include <WebServer.h>
 
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
-#define WIFI_SSID "ASUS_2G"
-#define WIFI_PASSWORD "09231610!"
 
 // Insert Firebase project API Key
 #define API_KEY "AIzaSyBm0URw8vqpjDtho1QIryIANt81f_SQ4qY"
@@ -41,74 +40,130 @@ int counter = 0;
 #define S3 0
 #define SIG 36
 
+// Replace with your network credentials
+const char* ssid = "DoseRx";
+const char* password = "DoseRx123!";
+  
+// Create a WebServer object on port 80
+WebServer server(80);
+
+// Variables to store input data
+String SSID = "";
+String PASS = "";
+
+
+
+void handleRoot() {
+  String html = "<html>\
+  <body>\
+    <h1>ESP32 Web Server</h1>\
+    <form action=\"/submit\" method=\"POST\">\
+      Wifi SSID:<br>\
+      <input type=\"text\" name=\"Wifi SSID\"><br>\
+      Password:<br>\
+      <input type=\"text\" name=\"Password\"><br><br>\
+      <input type=\"submit\" value=\"Submit\">\
+    </form>\
+  </body>\
+  </html>";
+  server.send(200, "text/html", html);
+}
+
+void animation(){
+  // animation
+  while(true) { 
+    u8g2.clearBuffer(); 
+    u8g2.drawXBMP(0, 0, 128, 64, myAni.getBitmap(counter));
+    u8g2.sendBuffer(); 
+    counter = (counter + 1) % 42; 
+    if (counter == 41) { 
+      delay(1000);
+      break;
+    }
+  }
+}
+
+void handleSubmit() {
+  if (server.method() == HTTP_POST) {
+    SSID = server.arg("Wifi SSID");
+    PASS = server.arg("Password");
+
+    Serial.println(SSID);
+    Serial.print(PASS);
+    WiFi.begin(SSID.c_str(), PASS.c_str());
+    while (WiFi.status() != WL_CONNECTED){
+      Serial.print(".");
+      delay(300);
+    }
+    Serial.println();
+    Serial.print("Connected with IP: ");
+    Serial.println(WiFi.localIP());
+    Serial.println();
+    
+    config.api_key = API_KEY;
+    config.database_url = DATABASE_URL;
+
+    // Sign up 
+    if (Firebase.signUp(&config, &auth, "", "")){
+      Serial.println("ok");
+      signupOK = true;
+    }
+    else{
+      Serial.printf("%s\n", config.signer.signupError.message.c_str());
+    }
+    config.token_status_callback = tokenStatusCallback; 
+    Firebase.begin(&config, &auth);
+    Firebase.reconnectWiFi(true);
+
+    String response = "Thank you!";
+    server.send(200, "text/html", response);
+  } else {
+    server.send(405, "text/plain", "Method Not Allowed");
+  }
+}
 
 void setup() {
   Serial.begin(115200);
   u8g2.begin(); // start the u8g2 library
 
-
-// CD74HC4067
+  // CD74HC4067
   pinMode(S0, OUTPUT);
   pinMode(S1, OUTPUT);
   pinMode(S2, OUTPUT);
   pinMode(S3, OUTPUT);
   pinMode(SIG, INPUT);
 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED){
-    Serial.print(".");
-    delay(300);
-  }
+  Serial.begin(115200);
+
+  // Set up Access Point
+  WiFi.softAP(ssid, password);
+
   Serial.println();
-  Serial.print("Connected with IP: ");
-  Serial.println(WiFi.localIP());
-  Serial.println();
+  Serial.print("Access Point \"");
+  Serial.print(ssid);
+  Serial.println("\" started");
 
-  config.api_key = API_KEY;
-  config.database_url = DATABASE_URL;
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("IP Address: ");
+  Serial.println(IP);
 
-//  Sign up 
-  if (Firebase.signUp(&config, &auth, "", "")){
-    Serial.println("ok");
-    signupOK = true;
-  }
-  else{
-    Serial.printf("%s\n", config.signer.signupError.message.c_str());
-  }
-  config.token_status_callback = tokenStatusCallback; 
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectWiFi(true);
+  // Set up server routes
+  server.on("/", handleRoot);
+  server.on("/submit", HTTP_POST, handleSubmit);
 
+  // Start server
+  server.begin();
+  Serial.println("HTTP server started");
 
-  // // initialize with the I2C addr 0x3D (for the 128x64)
-  if (!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+  // initialize with the I2C addr 0x3D (for the 128x64)
+  if(!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("failed to start SSD1306 OLED"));
     while (1);
   }
-
-  // //stream
-  // if(!Firebase. RTDB.beginStream(&fbdo_s1, "sensor/slot-1")) {
-  // Serial.printf("stream 1 begin error, %s\n\n", fbdo_s1.errorReason ().c_str());}
-  // if(!Firebase. RTDB.beginStream(&fbdo_s2, "sensor/slot-2")) {
-  // Serial.printf("stream 1 begin error, %s\n\n", fbdo_s2.errorReason ().c_str());}
-
-// for lcd
+  oled.clearDisplay();
   oled.clearDisplay(); // clear display
   oled.setTextSize(1);         // set text size
   oled.setTextColor(WHITE);    // set text color
-// animation
-while (true) { 
-  u8g2.clearBuffer(); 
-  u8g2.drawXBMP(0, 0, 128, 64, myAni.getBitmap(counter));
-  u8g2.sendBuffer(); 
-  counter = (counter + 1) % 42; 
-  if (counter == 41) { 
-    delay(1000);
-    break;
-  }
-}
-
 
 }
 
@@ -122,16 +177,17 @@ void selectMuxChannel(int channel) {
 bool channel0() {
     selectMuxChannel(0);
     int analogValue = analogRead(SIG);
-    return analogValue;
+    // return analogValue;
     if(analogValue > 350){
-      
+      return true;
     } else{
       return false;
     }
 }
 
-
 void loop() {
+  server.handleClient();
+
   int value0 = channel0();
 
   oled.setCursor(0, 20);       
@@ -141,7 +197,6 @@ void loop() {
   oled.setCursor(0, 40);       
   oled.println("date: 00/00/00");
   oled.display();   
-
 
   if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0)){
     sendDataPrevMillis = millis();
@@ -161,5 +216,4 @@ void loop() {
       Serial.println(fbdo.errorReason());
     }
   }
-
 }
