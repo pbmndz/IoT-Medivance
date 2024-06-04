@@ -7,6 +7,10 @@
 #include <U8g2lib.h>
 #include "ani.h"
 #include <WebServer.h>
+// #include <Preferences.h>
+
+// Preferences preferences;
+
 
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
@@ -51,55 +55,237 @@ WebServer server(80);
 String SSID = "";
 String PASS = "";
 
-
-
 void handleRoot() {
-  String html = "<html>\
+  String html = "<!DOCTYPE html>\
+  <html>\
+  <head>\
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\
+    <style>\
+      body {\
+        font-family: Arial, sans-serif;\
+        margin: 0;\
+        padding: 0;\
+      }\
+      .center-form {\
+        display: flex;\
+        flex-direction: column;\
+        justify-content: center;\
+        align-items: center;\
+        height: 100vh;\
+      }\
+      .center-form form {\
+        width: 80%;\
+        max-width: 300px;\
+        font-size: 0.9em;\
+        text-align: center;\
+      }\
+      h1 {\
+        font-size: 1.5em;\
+      }\
+      p {\
+        font-size: 0.8em;\
+        text-align: center;\
+      }\
+      input[type=\"text\"],\
+      input[type=\"password\"] {\
+        width: calc(100% - 20px);\
+        height: 25px;\
+        font-size: 0.9em;\
+        margin-bottom: 10px;\
+        padding: 5px;\
+      }\
+      input[type=\"submit\"] {\
+        width: 100%;\
+        height: 30px;\
+        font-size: 0.9em;\
+        background-color: #4CAF50;\
+        color: white;\
+        border: none;\
+        cursor: pointer;\
+      }\
+      @media only screen and (max-width: 600px) {\
+        .center-form form {\
+          font-size: 0.8em;\
+        }\
+        h1 {\
+          font-size: 1.2em;\
+        }\
+        p {\
+          font-size: 0.7em;\
+        }\
+        input[type=\"text\"],\
+        input[type=\"password\"] {\
+          height: 30px;\
+          font-size: 0.8em;\
+        }\
+        input[type=\"submit\"] {\
+          height: 40px;\
+          font-size: 0.8em;\
+        }\
+      }\
+    </style>\
+  </head>\
   <body>\
-    <h1>ESP32 Web Server</h1>\
-    <form action=\"/submit\" method=\"POST\">\
-      Wifi SSID:<br>\
-      <input type=\"text\" name=\"Wifi SSID\"><br>\
-      Password:<br>\
-      <input type=\"text\" name=\"Password\"><br><br>\
-      <input type=\"submit\" value=\"Submit\">\
-    </form>\
+    <div class=\"center-form\">\
+      <h1>Please Enter your Wifi Credentials</h1>\
+      <p>Please enter the correct Wifi SSID and Password:</p>\
+      <form action=\"/submit\" method=\"POST\">\
+        Wifi SSID:<br>\
+        <input type=\"text\" name=\"Wifi SSID\"><br>\
+        Password:<br>\
+        <input type=\"text\" name=\"Password\"><br><br>\
+        <input type=\"submit\" value=\"Submit\">\
+      </form>\
+    </div>\
   </body>\
   </html>";
+
   server.send(200, "text/html", html);
 }
 
-void animation(){
-  // animation
-  while(true) { 
-    u8g2.clearBuffer(); 
-    u8g2.drawXBMP(0, 0, 128, 64, myAni.getBitmap(counter));
-    u8g2.sendBuffer(); 
-    counter = (counter + 1) % 42; 
-    if (counter == 41) { 
-      delay(1000);
-      break;
-    }
-  }
+
+void Wrong() {
+  String tryAgain = "<!DOCTYPE html>\
+  <html>\
+  <head>\
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\
+    <style>\
+      body {\
+        font-family: Arial, sans-serif;\
+        margin: 0;\
+        padding: 0;\
+      }\
+      .center-form {\
+        display: flex;\
+        flex-direction: column;\
+        justify-content: center;\
+        align-items: center;\
+        height: 100vh;\
+      }\
+      .center-form form {\
+        width: 80%;\
+        max-width: 300px;\
+        font-size: 0.9em;\
+        text-align: center;\
+      }\
+      h1 {\
+        font-size: 1.5em;\
+      }\
+      p {\
+        font-size: 0.8em;\
+        text-align: center;\
+      }\
+      input[type=\"text\"],\
+      input[type=\"password\"] {\
+        width: calc(100% - 20px);\
+        height: 25px;\
+        font-size: 0.9em;\
+        margin-bottom: 10px;\
+        padding: 5px;\
+      }\
+      input[type=\"submit\"] {\
+        width: 100%;\
+        height: 30px;\
+        font-size: 0.9em;\
+        background-color: #4CAF50;\
+        color: white;\
+        border: none;\
+        cursor: pointer;\
+      }\
+      @media only screen and (max-width: 600px) {\
+        .center-form form {\
+          font-size: 0.8em;\
+        }\
+        h1 {\
+          font-size: 1.2em;\
+        }\
+        p {\
+          font-size: 0.7em;\
+        }\
+        input[type=\"text\"],\
+        input[type=\"password\"] {\
+          height: 30px;\
+          font-size: 0.8em;\
+        }\
+        input[type=\"submit\"] {\
+          height: 40px;\
+          font-size: 0.8em;\
+        }\
+      }\
+    </style>\
+  </head>\
+  <body>\
+    <div class=\"center-form\">\
+      <h1>Try Again Wrong SSID/Password</h1>\
+      <p>Please enter the correct Wifi SSID and Password:</p>\
+      <form action=\"/submit\" method=\"POST\">\
+        Wifi SSID:<br>\
+        <input type=\"text\" name=\"Wifi SSID\"><br>\
+        Password:<br>\
+        <input type=\"text\" name=\"Password\"><br><br>\
+        <input type=\"submit\" value=\"Submit\">\
+      </form>\
+    </div>\
+  </body>\
+  </html>";
+  server.send(200, "text/html", tryAgain);
 }
 
-void handleSubmit() {
-  if (server.method() == HTTP_POST) {
-    SSID = server.arg("Wifi SSID");
-    PASS = server.arg("Password");
+void handleWiFiConnected() {
+  String success = "<!DOCTYPE html>\
+  <html>\
+  <head>\
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\
+    <style>\
+      body {\
+        font-family: Arial, sans-serif;\
+        margin: 0;\
+        padding: 0;\
+      }\
+      .center-form {\
+        display: flex;\
+        flex-direction: column;\
+        justify-content: center;\
+        align-items: center;\
+        height: 100vh;\
+      }\
+      .center-form form {\
+        width: 80%;\
+        max-width: 300px;\
+        font-size: 0.9em;\
+        text-align: center;\
+      }\
+      h1 {\
+        font-size: 2em;\
+      }\
+      p {\
+        font-size: 1em;\
+        text-align: center;\
+      }\
+      @media only screen and (max-width: 600px) {\
+        .center-form form {\
+          font-size: 0.8em;\
+        }\
+        h1 {\
+          font-size: 1.5em;\
+        }\
+        p {\
+          font-size: 0.9 em;\
+        }\
+    </style>\
+  </head>\
+  <body>\
+    <div class=\"center-form\">\
+      <h1>DoseRx is Connected</h1>\
+      <p>you may now close the browser and reconnect to your wifi</p>\
+    </div>\
+  </body>\
+  </html>";
+  server.send(200, "text/html", success);
+}
 
-    Serial.println(SSID);
-    Serial.print(PASS);
-    WiFi.begin(SSID.c_str(), PASS.c_str());
-    while (WiFi.status() != WL_CONNECTED){
-      Serial.print(".");
-      delay(300);
-    }
-    Serial.println();
-    Serial.print("Connected with IP: ");
-    Serial.println(WiFi.localIP());
-    Serial.println();
-    
+
+void fireBase() {
     config.api_key = API_KEY;
     config.database_url = DATABASE_URL;
 
@@ -114,14 +300,53 @@ void handleSubmit() {
     config.token_status_callback = tokenStatusCallback; 
     Firebase.begin(&config, &auth);
     Firebase.reconnectWiFi(true);
+}
 
-    String response = "Thank you!";
-    server.send(200, "text/html", response);
-  } else {
-    server.send(405, "text/plain", "Method Not Allowed");
+void handleSubmit() {
+  if(server.method() == HTTP_POST) {
+    SSID = server.arg("Wifi SSID");
+    PASS = server.arg("Password");
+    Serial.println(SSID);
+    Serial.print(PASS);
+
+    WiFi.begin(SSID.c_str(), PASS.c_str());
+    unsigned long startMillis = millis();  
+    while (WiFi.status() != WL_CONNECTED) {
+      if (millis() - startMillis >= 15000) {  // If 15 seconds have passed
+        Serial.println("Failed to connect to WiFi after 15 seconds.");
+        Wrong();
+        break;
+      }
+      Serial.print(".");
+      delay(300);
+    } 
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println();
+      Serial.print("Connected with IP: ");
+      Serial.println(WiFi.localIP());
+      handleWiFiConnected();
+      fireBase();
+      // preferences.putString("network_name", SSID);
+      // preferences.putString("network_password", PASS);
+      // preferences.end();
+    } 
   }
 }
 
+
+void animation(){
+  // animation
+  while(true) { 
+    u8g2.clearBuffer(); 
+    u8g2.drawXBMP(0, 0, 128, 64, myAni.getBitmap(counter));
+    u8g2.sendBuffer(); 
+    counter = (counter + 1) % 42; 
+    if (counter == 41) { 
+      delay(1000);
+      break;
+    }
+  }
+}
 void setup() {
   Serial.begin(115200);
   u8g2.begin(); // start the u8g2 library
@@ -151,6 +376,7 @@ void setup() {
   server.on("/", handleRoot);
   server.on("/submit", HTTP_POST, handleSubmit);
 
+  
   // Start server
   server.begin();
   Serial.println("HTTP server started");
@@ -186,6 +412,8 @@ bool channel0() {
 }
 
 void loop() {
+
+
   server.handleClient();
 
   int value0 = channel0();
