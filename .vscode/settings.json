@@ -19,6 +19,7 @@
         "type_traits": "cpp",
         "utility": "cpp",
         "regex": "cpp",
-        "cstdlib": "cpp"
+        "cstdlib": "cpp",
+        "typeinfo": "cpp"
     }
 }

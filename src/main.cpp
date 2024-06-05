@@ -7,10 +7,9 @@
 #include <U8g2lib.h>
 #include "ani.h"
 #include <WebServer.h>
-// #include <Preferences.h>
+#include <Preferences.h>
 
-// Preferences preferences;
-
+Preferences preferences;
 
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
@@ -47,13 +46,12 @@ int counter = 0;
 // Replace with your network credentials
 const char* ssid = "DoseRx";
 const char* password = "DoseRx123!";
-  
+
+// preference saved SSID and Password
+String SSID;
+String PASS;
 // Create a WebServer object on port 80
 WebServer server(80);
-
-// Variables to store input data
-String SSID = "";
-String PASS = "";
 
 void handleRoot() {
   String html = "<!DOCTYPE html>\
@@ -142,7 +140,6 @@ void handleRoot() {
 
   server.send(200, "text/html", html);
 }
-
 
 void Wrong() {
   String tryAgain = "<!DOCTYPE html>\
@@ -284,7 +281,6 @@ void handleWiFiConnected() {
   server.send(200, "text/html", success);
 }
 
-
 void fireBase() {
     config.api_key = API_KEY;
     config.database_url = DATABASE_URL;
@@ -304,10 +300,15 @@ void fireBase() {
 
 void handleSubmit() {
   if(server.method() == HTTP_POST) {
-    SSID = server.arg("Wifi SSID");
-    PASS = server.arg("Password");
+    String SSID = server.arg("Wifi SSID");
+    String PASS = server.arg("Password");
     Serial.println(SSID);
     Serial.print(PASS);
+
+    preferences.begin("credentials", false);
+    preferences.putString("ssid", SSID);
+    preferences.putString("pass", PASS);
+    preferences.end();
 
     WiFi.begin(SSID.c_str(), PASS.c_str());
     unsigned long startMillis = millis();  
@@ -326,13 +327,64 @@ void handleSubmit() {
       Serial.println(WiFi.localIP());
       handleWiFiConnected();
       fireBase();
-      // preferences.putString("network_name", SSID);
-      // preferences.putString("network_password", PASS);
-      // preferences.end();
     } 
   }
 }
 
+// void wifiDisconnected(){
+// }
+
+void webServerStart(){
+  WiFi.softAP(ssid, password);
+  Serial.println();
+  Serial.print("Access Point \"");
+  Serial.print(ssid);
+  Serial.println("\" started");
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("IP Address: ");
+  Serial.println(IP);
+// Set up server routes
+  server.on("/", handleRoot);
+  server.on("/submit", HTTP_POST, handleSubmit);
+// Start server
+  server.begin();
+  Serial.println("HTTP server started");  
+// clear wifi cred
+  preferences.begin("credentials", false);
+  preferences.clear();
+  preferences.end();
+}
+
+void SavedCredentials(){
+    preferences.begin("credentials", false);
+    String savedSSID = preferences.getString("ssid");
+    String savedPASS = preferences.getString("pass");
+    preferences.end();
+
+    Serial.println();
+    Serial.println("trying connecting to saved credentials .........");
+    Serial.println(savedSSID);
+    Serial.println(savedPASS);
+
+    WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
+    unsigned long startMillis = millis();  
+    while (WiFi.status() != WL_CONNECTED) {
+      if (savedSSID == "" || savedPASS == "" or millis() - startMillis >= 15000){
+        webServerStart();
+        break;
+      }
+      Serial.print(".");
+      delay(300);
+
+    } 
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println();
+      Serial.print("Connected with IP: ");
+      Serial.println(WiFi.localIP());
+      handleWiFiConnected();
+      fireBase();
+    } 
+}
 
 void animation(){
   // animation
@@ -350,6 +402,7 @@ void animation(){
 void setup() {
   Serial.begin(115200);
   u8g2.begin(); // start the u8g2 library
+  SavedCredentials();
 
   // CD74HC4067
   pinMode(S0, OUTPUT);
@@ -358,39 +411,15 @@ void setup() {
   pinMode(S3, OUTPUT);
   pinMode(SIG, INPUT);
 
-  Serial.begin(115200);
-
-  // Set up Access Point
-  WiFi.softAP(ssid, password);
-
-  Serial.println();
-  Serial.print("Access Point \"");
-  Serial.print(ssid);
-  Serial.println("\" started");
-
-  IPAddress IP = WiFi.softAPIP();
-  Serial.print("IP Address: ");
-  Serial.println(IP);
-
-  // Set up server routes
-  server.on("/", handleRoot);
-  server.on("/submit", HTTP_POST, handleSubmit);
-
-  
-  // Start server
-  server.begin();
-  Serial.println("HTTP server started");
-
   // initialize with the I2C addr 0x3D (for the 128x64)
   if(!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("failed to start SSD1306 OLED"));
     while (1);
   }
-  oled.clearDisplay();
-  oled.clearDisplay(); // clear display
+
+  oled.clearDisplay();         // clear display
   oled.setTextSize(1);         // set text size
   oled.setTextColor(WHITE);    // set text color
-
 }
 
 void selectMuxChannel(int channel) {
@@ -411,8 +440,17 @@ bool channel0() {
     }
 }
 
-void loop() {
+// bool wifidisconnected = false;
 
+// void disconnected(){
+//     webServerStart();
+//     bool wifidisconnected = false;
+// }
+void loop() {
+// //WiFi.status() != WL_CONNECTED or
+//   if(wifidisconnected == true){
+//     disconnected();
+//   }else{
 
   server.handleClient();
 
@@ -442,6 +480,8 @@ void loop() {
       Serial.print("FAILED");
       Serial.print("REASON: " );
       Serial.println(fbdo.errorReason());
+      bool wifidisconnected = true;
+      }
     }
   }
-}
+// }
