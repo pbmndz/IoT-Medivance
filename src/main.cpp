@@ -26,6 +26,13 @@ FirebaseConfig config;
 unsigned long sendDataPrevMillis = 0;
 bool signupOK = false;
 
+
+///////////////////////
+//debuging station ahhas
+
+
+///////////////////////
+
 // lcd
 #define SCREEN_WIDTH 128 // OLED width,  in pixels
 #define SCREEN_HEIGHT 64 // OLED height, in pixels
@@ -53,6 +60,7 @@ String PASS;
 // Create a WebServer object on port 80
 WebServer server(80);
 
+// website
 void handleRoot() {
   String html = "<!DOCTYPE html>\
   <html>\
@@ -280,7 +288,9 @@ void handleWiFiConnected() {
   </html>";
   server.send(200, "text/html", success);
 }
+// end website
 
+// start webserver
 void fireBase() {
     config.api_key = API_KEY;
     config.database_url = DATABASE_URL;
@@ -302,8 +312,10 @@ void handleSubmit() {
   if(server.method() == HTTP_POST) {
     String SSID = server.arg("Wifi SSID");
     String PASS = server.arg("Password");
+    Serial.print("SSID: ");
     Serial.println(SSID);
-    Serial.print(PASS);
+    Serial.print("PASS: ");
+    Serial.println(PASS);
 
     preferences.begin("credentials", false);
     preferences.putString("ssid", SSID);
@@ -323,6 +335,7 @@ void handleSubmit() {
     } 
     if (WiFi.status() == WL_CONNECTED) {
       Serial.println();
+      Serial.println("handleSubmit");
       Serial.print("Connected with IP: ");
       Serial.println(WiFi.localIP());
       handleWiFiConnected();
@@ -330,9 +343,6 @@ void handleSubmit() {
     } 
   }
 }
-
-// void wifiDisconnected(){
-// }
 
 void webServerStart(){
   WiFi.softAP(ssid, password);
@@ -353,6 +363,7 @@ void webServerStart(){
   preferences.begin("credentials", false);
   preferences.clear();
   preferences.end();
+  WiFi.disconnect();
 }
 
 void SavedCredentials(){
@@ -370,6 +381,7 @@ void SavedCredentials(){
     unsigned long startMillis = millis();  
     while (WiFi.status() != WL_CONNECTED) {
       if (savedSSID == "" || savedPASS == "" or millis() - startMillis >= 15000){
+        
         webServerStart();
         break;
       }
@@ -383,9 +395,11 @@ void SavedCredentials(){
       Serial.println(WiFi.localIP());
       handleWiFiConnected();
       fireBase();
-    } 
+  } 
 }
 
+
+// animation
 void animation(){
   // animation
   while(true) { 
@@ -399,29 +413,8 @@ void animation(){
     }
   }
 }
-void setup() {
-  Serial.begin(115200);
-  u8g2.begin(); // start the u8g2 library
-  SavedCredentials();
 
-  // CD74HC4067
-  pinMode(S0, OUTPUT);
-  pinMode(S1, OUTPUT);
-  pinMode(S2, OUTPUT);
-  pinMode(S3, OUTPUT);
-  pinMode(SIG, INPUT);
-
-  // initialize with the I2C addr 0x3D (for the 128x64)
-  if(!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("failed to start SSD1306 OLED"));
-    while (1);
-  }
-
-  oled.clearDisplay();         // clear display
-  oled.setTextSize(1);         // set text size
-  oled.setTextColor(WHITE);    // set text color
-}
-
+// sensor value
 void selectMuxChannel(int channel) {
   digitalWrite(S0, bitRead(channel, 0));
   digitalWrite(S1, bitRead(channel, 1));
@@ -440,31 +433,62 @@ bool channel0() {
     }
 }
 
-// bool wifidisconnected = false;
+bool reconnectAttempted = false;
+void checkAndReconnectWiFi() {
+  if (WiFi.status() != WL_CONNECTED && !reconnectAttempted) {
+    Serial.println("WiFi is disconnected. Trying to reconnect...");
+    SavedCredentials(); // Try to reconnect using saved credentials
+    reconnectAttempted = true;
+    // Check if reconnection was successful
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("Reconnected successfully!");
+    } else {
+      Serial.println("Reconnection failed. Please enter new SSID/PASS.");
+      webServerStart();
+    }
+    // Reset the flag after the reconnection process
+    reconnectAttempted = false;
+  }
+}
 
-// void disconnected(){
-//     webServerStart();
-//     bool wifidisconnected = false;
-// }
+void setup() {
+  Serial.begin(115200);
+  u8g2.begin(); // start the u8g2 library
+  
+  // CD74HC4067
+  pinMode(S0, OUTPUT);
+  pinMode(S1, OUTPUT);
+  pinMode(S2, OUTPUT);
+  pinMode(S3, OUTPUT);
+  pinMode(SIG, INPUT);
+
+  // initialize with the I2C addr 0x3D (for the 128x64)
+  if(!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("failed to start SSD1306 OLED"));
+    while (1);
+  }
+  
+  SavedCredentials();
+  animation();
+
+  oled.clearDisplay();         // clear display
+  oled.setTextSize(1);         // set text size
+  oled.setTextColor(WHITE);    // set text color
+}
+
+bool wasConnected = false;
+
 void loop() {
-// //WiFi.status() != WL_CONNECTED or
-//   if(wifidisconnected == true){
-//     disconnected();
-//   }else{
+  bool isConnected = WiFi.status() == WL_CONNECTED; 
+
+  if (wasConnected && !isConnected) {
+    Serial.println("Internet connection was interrupted.");
+    checkAndReconnectWiFi();
+  }
 
   server.handleClient();
-
   int value0 = channel0();
-
-  oled.setCursor(0, 20);       
-  oled.println("welcome / user"); 
-  oled.setCursor(0, 30);       
-  oled.println("next intake in: 00/00"); 
-  oled.setCursor(0, 40);       
-  oled.println("date: 00/00/00");
-  oled.display();   
-
-  if (Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0)){
+  if (WiFi.status() == WL_CONNECTED && Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0 )){
     sendDataPrevMillis = millis();
 
     int value0 = channel0();
@@ -480,8 +504,9 @@ void loop() {
       Serial.print("FAILED");
       Serial.print("REASON: " );
       Serial.println(fbdo.errorReason());
-      bool wifidisconnected = true;
       }
     }
-  }
-// }
+  
+  wasConnected = isConnected;
+}
+
