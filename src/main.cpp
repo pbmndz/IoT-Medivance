@@ -9,8 +9,6 @@
 #include <WebServer.h>
 #include <Preferences.h>
 
-Preferences preferences;
-
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 
@@ -23,15 +21,8 @@ Preferences preferences;
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
-unsigned long sendDataPrevMillis = 0;
-bool signupOK = false;
-
-
-///////////////////////
-//debuging station ahhas
-
-
-///////////////////////
+// Preferences
+Preferences preferences;
 
 // lcd
 #define SCREEN_WIDTH 128 // OLED width,  in pixels
@@ -49,16 +40,28 @@ int counter = 0;
 #define S2 4
 #define S3 0
 #define SIG 36
+// button
+const int analogPin = 39; 
+int analogValue = 0; 
 
-// Replace with your network credentials
+// Wifi //
+// Replace with your network credentials 
+// local wifi
 const char* ssid = "DoseRx";
 const char* password = "DoseRx123!";
-
-// preference saved SSID and Password
+// Flash Memory preference saved SSID and Password
 String SSID;
 String PASS;
-// Create a WebServer object on port 80
-WebServer server(80);
+WebServer server(80); // Create a WebServer object on port 80
+
+// bool to run once
+//for checkAndReconnectWiFi
+bool reconnectAttempted = false; 
+//for loop
+bool wasConnected = false;
+bool pressed = false;
+unsigned long sendDataPrevMillis = 0;
+bool signupOK = false;
 
 // website
 void handleRoot() {
@@ -398,8 +401,23 @@ void SavedCredentials(){
   } 
 }
 
+void checkAndReconnectWiFi() {
+  if (WiFi.status() != WL_CONNECTED && !reconnectAttempted) {
+    Serial.println("WiFi is disconnected. Trying to reconnect...");
+    SavedCredentials(); // Try to reconnect using saved credentials
+    reconnectAttempted = true;
+    // Check if reconnection was successful
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("Reconnected successfully!");
+    } else {
+      Serial.println("Reconnection failed. Please enter new SSID/PASS.");
+    }
+    // Reset the flag after the reconnection process
+    reconnectAttempted = false;
+  }
+}
 
-// animation
+// display
 void animation(){
   // animation
   while(true) { 
@@ -414,7 +432,7 @@ void animation(){
   }
 }
 
-// sensor value
+// sensor value 
 void selectMuxChannel(int channel) {
   digitalWrite(S0, bitRead(channel, 0));
   digitalWrite(S1, bitRead(channel, 1));
@@ -431,24 +449,6 @@ bool channel0() {
     } else{
       return false;
     }
-}
-
-bool reconnectAttempted = false;
-void checkAndReconnectWiFi() {
-  if (WiFi.status() != WL_CONNECTED && !reconnectAttempted) {
-    Serial.println("WiFi is disconnected. Trying to reconnect...");
-    SavedCredentials(); // Try to reconnect using saved credentials
-    reconnectAttempted = true;
-    // Check if reconnection was successful
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("Reconnected successfully!");
-    } else {
-      Serial.println("Reconnection failed. Please enter new SSID/PASS.");
-      webServerStart();
-    }
-    // Reset the flag after the reconnection process
-    reconnectAttempted = false;
-  }
 }
 
 void setup() {
@@ -476,23 +476,34 @@ void setup() {
   oled.setTextColor(WHITE);    // set text color
 }
 
-bool wasConnected = false;
-
 void loop() {
   bool isConnected = WiFi.status() == WL_CONNECTED; 
+  server.handleClient();
 
+// save values for CD74HC4067 
+  int value0 = channel0();
+// read the value from pins
+  analogValue = analogRead(analogPin);
+
+// button force wifi reset 
+  if (analogValue > 2300 && analogValue < 2800 && pressed == false && WiFi.status() == WL_CONNECTED){
+    Serial.print("network dissconnected");
+    Serial.print(" button value: ");
+    Serial.println(analogValue);
+    preferences.begin("credentials", false);
+    preferences.clear();
+    preferences.end();
+    WiFi.disconnect();
+    pressed = true;
+  }
   if (wasConnected && !isConnected) {
     Serial.println("Internet connection was interrupted.");
     checkAndReconnectWiFi();
   }
-
-  server.handleClient();
-  int value0 = channel0();
   if (WiFi.status() == WL_CONNECTED && Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0 )){
     sendDataPrevMillis = millis();
-
     int value0 = channel0();
-
+    pressed = false;
     if (Firebase.RTDB.setInt(&fbdo, "sensor/slot-1", value0)){
       Serial.println();
       Serial.print(value0);
@@ -506,7 +517,6 @@ void loop() {
       Serial.println(fbdo.errorReason());
       }
     }
-  
   wasConnected = isConnected;
 }
 
