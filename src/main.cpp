@@ -493,15 +493,15 @@ void selectMuxChannel(int channel) {
   digitalWrite(S3, bitRead(channel, 3));
 }
 
-bool channel0() {
+int channel0() {
     selectMuxChannel(0);
     int analogValue = analogRead(SIG);
-    // return analogValue;
-    if(analogValue > 350){
-      return true;
-    } else{
-      return false;
-    }
+    return analogValue;
+    // if(analogValue > 350){
+    //   return true;
+    // } else{
+    //   return false;
+    // }
 }
 
 // 'scan to connect', 128x64px
@@ -756,6 +756,7 @@ void loop() {
 
 // save values for CD74HC4067 
   int value0 = channel0();
+  Serial.println(value0);
 // read the value from pins
   analogValue = analogRead(analogPin);
 
