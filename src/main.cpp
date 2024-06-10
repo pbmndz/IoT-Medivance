@@ -13,9 +13,9 @@
 #include "addons/RTDBHelper.h"
 
 // Insert Firebase project API Key
-#define API_KEY "AIzaSyBm0URw8vqpjDtho1QIryIANt81f_SQ4qY"
+#define API_KEY "AIzaSyBmJ0ibz-8MF6HP7H3wJeKhxYx1Rwca17Y"
 // Insert RTDB URLefine the RTDB URL 
-#define DATABASE_URL "https://esp32-iot-39031-default-rtdb.asia-southeast1.firebasedatabase.app/" 
+#define DATABASE_URL "https://mydoserx-app-default-rtdb.firebaseio.com/" 
 
 //Define Firebase Data object
 FirebaseData fbdo;
@@ -406,7 +406,6 @@ void webServerStart(){
   preferences.clear();
   preferences.end();
   WiFi.disconnect();
-  
 }
 
 void SavedCredentials(){
@@ -640,12 +639,6 @@ const unsigned char epd_bitmap_SCAN_TO_GO_WEBSITE [] PROGMEM = {
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
-
-
-
-
-
-
 const unsigned char epd_bitmap_wifi_icon [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -713,16 +706,6 @@ const unsigned char epd_bitmap_wifi_icon [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-
-
-
-
-
-
-
-
-
-
 void setup() {
   Serial.begin(115200);
   u8g2.begin(); // start the u8g2 library
@@ -756,7 +739,7 @@ void loop() {
 
 // save values for CD74HC4067 
   int value0 = channel0();
-  Serial.println(value0);
+  // Serial.println(value0);
 // read the value from pins
   analogValue = analogRead(analogPin);
 
@@ -799,35 +782,17 @@ void loop() {
     WiFi.disconnect();
     pressed = true;
   }
-
   if(WiFi.status() == WL_CONNECTED){
-
     struct tm timeinfo;
-    oled.clearDisplay();         // clear display
-    oled.setTextSize(1);         // set text size
-    oled.setTextColor(WHITE);    // set text color
-    // oled.setCursor(0, 0); 
+    oled.clearDisplay();        
+    oled.setTextSize(1);         
+    oled.setTextColor(WHITE);    
     oled.drawBitmap(0, 0, epd_bitmap_wifi_icon, 128, 64, 1);      
-    // oled.print("WL.status: ");
-    // // if(WiFi.status() == WL_CONNECTED){
-    // //   oled.print("con");
-    // // }else{
-    // //   oled.print("discon");
-    // // }
     setTime();
-
-    // oled.setCursor(0, 20);       
-    // oled.println(&timeinfo, "%B %d %Y");  ///mon/day/year
-    // oled.setCursor(0, 30);       
-    // oled.println(&timeinfo, "%I:%M:%S %p");  //hr/min/sec/am/pm
-
     oled.setCursor(0, 40);       
     oled.println("next intake in: 00/00"); 
-
     oled.display();   
   }
-
-
 
   if (WiFi.status() == WL_CONNECTED && Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0 )){
     sendDataPrevMillis = millis();
@@ -850,4 +815,3 @@ void loop() {
   wasConnected = isConnected;
 
 }
-
