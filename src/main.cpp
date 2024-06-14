@@ -7,10 +7,12 @@
 #include <U8g2lib.h>
 #include <WebServer.h>
 #include <Preferences.h>
+#include "FastLED.h"
 #include "ani.h"
 #include "esp_sntp.h"
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
+
 
 // Insert Firebase project API Key
 #define API_KEY "AIzaSyBmJ0ibz-8MF6HP7H3wJeKhxYx1Rwca17Y"
@@ -40,9 +42,12 @@ int counter = 0;
 #define S2 4
 #define S3 0
 #define SIG 36
-// button
+// button 
+//reset
 const int analogPin = 39; 
 int analogValue = 0; 
+// stop
+const int analogPin = 34; 
 
 // Wifi //
 // Replace with your network credentials 
@@ -70,7 +75,10 @@ bool clearDisplayQR = true;
 const char* ntpServer = "asia.pool.ntp.org";
 const long  gmtOffset_sec = 8 * 3600; // Philippines is GMT +8
 const int   daylightOffset_sec = 0; // No daylight saving time in Philippines
-
+// LED Strips
+#define NUM_LEDS 5 // How many leds in your strip?
+#define DATA_PIN 16
+CRGB leds[NUM_LEDS]; // Define the array of leds
 
 
 void setTime(){
@@ -706,10 +714,14 @@ const unsigned char epd_bitmap_wifi_icon [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+
+
 void setup() {
+
+FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
+
   Serial.begin(115200);
   u8g2.begin(); // start the u8g2 library
-  
   // CD74HC4067
   pinMode(S0, OUTPUT);
   pinMode(S1, OUTPUT);
@@ -732,7 +744,24 @@ void setup() {
 
 
 void loop() {
+  
 
+  leds[0] = CRGB::Green;
+  leds[1] = CRGB::Green;
+  leds[2] = CRGB::Green;
+  leds[3] = CRGB::Green ;
+  leds[4] = CRGB::Green ;
+  FastLED.show();
+  delay(1000);
+  leds[0] = CRGB::Black;
+  leds[1] = CRGB::Black;
+  leds[2] = CRGB::Black;
+  leds[3] = CRGB::Black;
+  leds[4] = CRGB::Black;
+  FastLED.show();
+  
+  delay(1000);
+  
   int currentStationCount = WiFi.softAPgetStationNum();
   bool isConnected = WiFi.status() == WL_CONNECTED; 
   server.handleClient();
@@ -740,8 +769,7 @@ void loop() {
 // save values for CD74HC4067 
   int value0 = channel0();
   // Serial.println(value0);
-// read the value from pins
-  analogValue = analogRead(analogPin);
+  int stopButton = analogPin;
 
   // If a user has connected
   if (clearDisplayQR == false){
