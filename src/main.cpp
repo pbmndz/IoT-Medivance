@@ -87,27 +87,20 @@ void setTime(){
     Serial.println("Failed to obtain time");
     return;
   }
-
   // Check if it's PM
   String AM_PM = (timeinfo.tm_hour >= 12) ? "PM" : "AM";
-
   // Convert hour from 24-hour to 12-hour format
   timeinfo.tm_hour = (timeinfo.tm_hour % 12 == 0) ? 12 : timeinfo.tm_hour % 12;
-  // %A, 
   char dateStringBuff[50]; //50 chars should be enough
   strftime(dateStringBuff, sizeof(dateStringBuff), "%B, %d, %Y", &timeinfo);
-
   char timeStringBuff[50]; //50 chars should be enough
   strftime(timeStringBuff, sizeof(timeStringBuff), "%I:%M:%S", &timeinfo);
-
   u8g2.setFont(u8g2_font_ncenB08_tr);
   u8g2.drawStr(5,25,dateStringBuff);
   u8g2.setCursor(5,35);
   u8g2.print(timeStringBuff);
   u8g2.print(" ");
   u8g2.print(AM_PM.c_str()); 
-
-
 }
 // website
 void handleRoot() {
@@ -778,16 +771,16 @@ void loop() {
   }
 
   if(WiFi.status() == WL_CONNECTED){
-    // struct tm timeinfo;
-    // u8g2.clearBuffer();
-    // u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
-    // setTime();   
-    // u8g2.setCursor(5,45);
-    // //make a gm gn and afternoon 
-    // u8g2.print("Goodevening ");
-    // u8g2.print(firstName().c_str()); 
-    // u8g2.sendBuffer(); 
-    timeToDrink();
+    struct tm timeinfo;
+    u8g2.clearBuffer();
+    u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
+    setTime();   
+    u8g2.setCursor(5,45);
+    //make a gm gn and afternoon 
+    u8g2.print("Goodevening ");
+    u8g2.print(firstName().c_str()); 
+    u8g2.sendBuffer(); 
+    // timeToDrink();
   }
 
   if (WiFi.status() == WL_CONNECTED && Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0 )){
