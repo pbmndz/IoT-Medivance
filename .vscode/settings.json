@@ -9,6 +9,7 @@
         "unordered_set": "cpp",
         "vector": "cpp",
         "string_view": "cpp",
+<<<<<<< HEAD
         "initializer_list": "cpp",
         "chrono": "cpp",
         "functional": "cpp",
@@ -21,5 +22,8 @@
         "regex": "cpp",
         "cstdlib": "cpp",
         "typeinfo": "cpp"
+=======
+        "initializer_list": "cpp"
+>>>>>>> 521a85e8006a4f41456c976ea95c12adde108f91
     }
 }
