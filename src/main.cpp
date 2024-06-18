@@ -86,21 +86,56 @@ void setTime(){
     Serial.println("Failed to obtain time");
     return;
   }
-  // Check if it's PM
+
+  // Calculate the number of seconds until 5 AM
+  struct tm targetTime = timeinfo; // Copy current time structure
+  targetTime.tm_hour = 5; // Set target hour to 5 AM
+  targetTime.tm_min = 0; // Set target minutes to 0
+  targetTime.tm_sec = 0; // Set target seconds to 0
+
+  // Adjust for next day if current hour is past 5 AM
+  if(timeinfo.tm_hour >= 5){
+    targetTime.tm_mday += 1;
+  }
+
+  // Convert both current time and target time to time_t format
+  time_t currentTime_t = mktime(&timeinfo);
+  time_t targetTime_t = mktime(&targetTime);
+
+  // Calculate difference in seconds
+  double secondsUntilTarget = difftime(targetTime_t, currentTime_t);
+
+  // Calculate hours, minutes, and seconds from difference
+  int hours = int(secondsUntilTarget) / 3600;
+  int minutes = (int(secondsUntilTarget) % 3600) / 60;
+  int seconds = int(secondsUntilTarget) % 60;
+
+  // Display current date and time as before
   String AM_PM = (timeinfo.tm_hour >= 12) ? "PM" : "AM";
-  // Convert hour from 24-hour to 12-hour format
-  timeinfo.tm_hour = (timeinfo.tm_hour % 12 == 0) ? 12 : timeinfo.tm_hour % 12;
-  char dateStringBuff[50]; //50 chars should be enough
-  strftime(dateStringBuff, sizeof(dateStringBuff), "%B, %d, %Y", &timeinfo);
-  char timeStringBuff[50]; //50 chars should be enough
-  strftime(timeStringBuff, sizeof(timeStringBuff), "%I:%M:%S", &timeinfo);
-  u8g2.setFont(u8g2_font_ncenB08_tr);
-  u8g2.drawStr(5,25,dateStringBuff);
-  u8g2.setCursor(5,35);
-  u8g2.print(timeStringBuff);
-  u8g2.print(" ");
-  u8g2.print(AM_PM.c_str()); 
+  
+   // Convert hour from the military (24-hour) format to the standard (12-hour) format for display purposes
+   int displayHour = timeinfo.tm_hour % 12;
+   if(displayHour == 0) displayHour = 12; // Convert '0' hour to '12' for readability
+
+   char dateStringBuff[50]; 
+   strftime(dateStringBuff, sizeof(dateStringBuff), "%B, %d, %Y", &timeinfo);
+   char timeStringBuff[50]; 
+   strftime(timeStringBuff, sizeof(timeStringBuff), "%I:%M:%S", &timeinfo);
+   
+   u8g2.setFont(u8g2_font_ncenB08_tr);
+   u8g2.drawStr(5,25,dateStringBuff);
+   u8g2.setCursor(5,35);
+   u8g2.print(timeStringBuff);
+   u8g2.print(" ");
+   u8g2.print(AM_PM.c_str());
+
+   // Display countdown timer
+   char countdownStringBuff[50];
+   sprintf(countdownStringBuff, "Countdown: %02d:%02d:%02d", hours, minutes, seconds);
+   u8g2.drawStr(5,45,countdownStringBuff); 
 }
+
+
 // website
 
 void handleRoot() {
@@ -158,6 +193,21 @@ void handleRoot() {
         border: none;\
         cursor: pointer;\
       }\
+      #loading {\
+        display: none;\
+        position: fixed;\
+        width: 100%;\
+        height: 100%;\
+        top: 0;\
+        left: 0;\
+        right: 0;\
+        bottom: 0;\
+        background-color: rgba(255, 255, 255, 0.8);\
+        z-index: 9999;\
+        text-align: center;\
+        padding-top: 200px;\
+        font-size: 1.5em;\
+      }\
       @media only screen and (max-width: 600px) {\
         .center-form form {\
           font-size: 0.8em;\
@@ -183,30 +233,36 @@ void handleRoot() {
         }\
       }\
     </style>\
+    <script>\
+      function refreshNetworks() {\
+        document.getElementById('loading').style.display = 'block';\
+        location.reload();\
+      }\
+    </script>\
   </head>\
   <body>\
-    <div class=\"center-form\">\
+    <div id=\"loading\">Scanning for networks...</div>\
+    <div class=\"center-form\" id=\"content\">\
       <h1>Please Enter your Wifi Credentials</h1>\
       <p>Please select your Wifi SSID and enter the Password:</p>\
       <form action=\"/submit\" method=\"POST\">\
         Wifi SSID:<br>\
         <select name=\"Wifi SSID\">";
-  int n = WiFi.scanNetworks();
-  for (int i = 0; i < n; ++i) {
-    html += "<option value=\"" + WiFi.SSID(i) + "\">" + WiFi.SSID(i) + "</option>";
-  }
-  html += "</select><br>\
-        Password:<br>\
-        <input type=\"password\" name=\"Password\"><br><br>\
-        <input type=\"submit\" value=\"Submit\">\
-      </form>\
-    </div>\
-  </body>\
-  </html>";
-  server.send(200, "text/html", html);
+        int n = WiFi.scanNetworks();
+        for (int i = 0; i < n; ++i) {
+          html += "<option value=\"" + WiFi.SSID(i) + "\">" + WiFi.SSID(i) + "</option>";
+        }
+        html += "</select><br>\
+        <button onclick=\"refreshNetworks()\">Refresh</button>\
+              Password:<br>\
+              <input type=\"password\" name=\"Password\"><br><br>\
+              <input type=\"submit\" value=\"Submit\">\
+            </form>\
+          </div>\
+        </body>\
+        </html>";
+    server.send(200, "text/html", html);
 }
-
-
 
 void Wrong() {
   String tryAgain = "<!DOCTYPE html>\
@@ -702,7 +758,6 @@ void timeToDrink(){
 }
 
 
-
 String  firstName(){
 if (Firebase.RTDB.getString(&fbdo, "usr/12345/first_name")) {
   if (fbdo.dataType() == "string") {
@@ -720,22 +775,6 @@ if (Firebase.RTDB.getString(&fbdo, "usr/12345/first_name")) {
 return "";
 }
 
-// void getSSIDWifi(){
-//     WiFi.mode(WIFI_STA);
-//   int n = WiFi.scanNetworks();
-//     if (n == 0) {
-//     Serial.println("No networks found.");
-//   } else {
-//     Serial.print(n);
-//     Serial.println(" networks found:");
-//     for (int i = 0; i < n; ++i) {
-//       // Print SSID and RSSI for each network found
-//       Serial.print(i + 1);
-//       Serial.print(": ");
-//       Serial.println(WiFi.SSID(i));
-//     }
-//   }
-// }
 
 void loop() {
   server.handleClient();
@@ -802,7 +841,7 @@ void loop() {
     u8g2.clearBuffer();
     u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
     setTime();   
-    u8g2.setCursor(5,45);
+    u8g2.setCursor(5,55);
     //make a gm gn and afternoon 
     u8g2.print("Goodevening ");
     u8g2.print(firstName().c_str()); 
@@ -832,4 +871,3 @@ void loop() {
   wasConnected = isConnected;
 
 }
-
