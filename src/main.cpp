@@ -44,8 +44,8 @@ int counter = 0;
 #define SIG 36
 // button 
 //reset
-const int analogPin = 39; 
-int analogValue = 0; 
+const int reset = 39; 
+
 // stop
 const int stopButton = 34; 
 
@@ -80,7 +80,6 @@ const int   daylightOffset_sec = 0; // No daylight saving time in Philippines
 #define DATA_PIN 16
 CRGB leds[NUM_LEDS]; // Define the array of leds
 
-
 void setTime(){
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo)){
@@ -103,6 +102,7 @@ void setTime(){
   u8g2.print(AM_PM.c_str()); 
 }
 // website
+
 void handleRoot() {
   String html = "<!DOCTYPE html>\
   <html>\
@@ -142,6 +142,13 @@ void handleRoot() {
         margin-bottom: 10px;\
         padding: 5px;\
       }\
+      select {\
+        width: calc(100% - 20px);\
+        height: 30px;\
+        font-size: 0.9em;\
+        margin-bottom: 10px;\
+        padding: 5px;\
+      }\
       input[type=\"submit\"] {\
         width: 100%;\
         height: 30px;\
@@ -166,6 +173,10 @@ void handleRoot() {
           height: 30px;\
           font-size: 0.8em;\
         }\
+        select {\
+          height: 35px;\
+          font-size: 0.8em;\
+        }\
         input[type=\"submit\"] {\
           height: 40px;\
           font-size: 0.8em;\
@@ -176,20 +187,26 @@ void handleRoot() {
   <body>\
     <div class=\"center-form\">\
       <h1>Please Enter your Wifi Credentials</h1>\
-      <p>Please enter the correct Wifi SSID and Password:</p>\
+      <p>Please select your Wifi SSID and enter the Password:</p>\
       <form action=\"/submit\" method=\"POST\">\
         Wifi SSID:<br>\
-        <input type=\"text\" name=\"Wifi SSID\"><br>\
+        <select name=\"Wifi SSID\">";
+  int n = WiFi.scanNetworks();
+  for (int i = 0; i < n; ++i) {
+    html += "<option value=\"" + WiFi.SSID(i) + "\">" + WiFi.SSID(i) + "</option>";
+  }
+  html += "</select><br>\
         Password:<br>\
-        <input type=\"text\" name=\"Password\"><br><br>\
+        <input type=\"password\" name=\"Password\"><br><br>\
         <input type=\"submit\" value=\"Submit\">\
       </form>\
     </div>\
   </body>\
   </html>";
-
   server.send(200, "text/html", html);
 }
+
+
 
 void Wrong() {
   String tryAgain = "<!DOCTYPE html>\
@@ -388,7 +405,8 @@ void handleSubmit() {
 }
 
 void webServerStart(){
-
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
   WiFi.softAP(ssid, password);
   Serial.println();
   Serial.print("Access Point \"");
@@ -400,6 +418,9 @@ void webServerStart(){
 // Set up server routes
   server.on("/", handleRoot);
   server.on("/submit", HTTP_POST, handleSubmit);
+  server.onNotFound([]() {
+    server.send(404, "text/plain", "404: Not found");
+  });
 // Start server
   server.begin();
   Serial.println("HTTP server started");  
@@ -407,7 +428,7 @@ void webServerStart(){
   preferences.begin("credentials", false);
   preferences.clear();
   preferences.end();
-  WiFi.disconnect();
+  WiFi.disconnect(); 
 }
 
 void SavedCredentials(){
@@ -661,13 +682,9 @@ FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
   pinMode(S2, OUTPUT);
   pinMode(S3, OUTPUT);
   pinMode(SIG, INPUT);
-
-  // // initialize with the I2C addr 0x3D (for the 128x64)
-  // if(!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-  //   Serial.println(F("failed to start SSD1306 OLED"));
-  //   for(;;);
-  // }
-  
+      // Start WiFi scan
+  Serial.println("Starting WiFi scan...");
+  WiFi.mode(WIFI_STA);
 
   SavedCredentials();
   animation();
@@ -703,23 +720,32 @@ if (Firebase.RTDB.getString(&fbdo, "usr/12345/first_name")) {
 return "";
 }
 
+// void getSSIDWifi(){
+//     WiFi.mode(WIFI_STA);
+//   int n = WiFi.scanNetworks();
+//     if (n == 0) {
+//     Serial.println("No networks found.");
+//   } else {
+//     Serial.print(n);
+//     Serial.println(" networks found:");
+//     for (int i = 0; i < n; ++i) {
+//       // Print SSID and RSSI for each network found
+//       Serial.print(i + 1);
+//       Serial.print(": ");
+//       Serial.println(WiFi.SSID(i));
+//     }
+//   }
+// }
+
 void loop() {
-  
+  server.handleClient();
+
 
   // leds[0] = CRGB::Green;
-  // leds[1] = CRGB::Green;
-  // leds[2] = CRGB::Green;
-  // leds[3] = CRGB::Green ;
-  // leds[4] = CRGB::Green ;
   // FastLED.show();
   // delay(1000);
   // leds[0] = CRGB::Black;
-  // leds[1] = CRGB::Black;
-  // leds[2] = CRGB::Black;
-  // leds[3] = CRGB::Black;
-  // leds[4] = CRGB::Black;
   // FastLED.show();
-  
   // delay(1000);
   
   int currentStationCount = WiFi.softAPgetStationNum();
@@ -729,7 +755,8 @@ void loop() {
 // save values for CD74HC4067 
   int value0 = channel0();
   // Serial.println(value0);
-  int stopButton = analogPin;
+  int resetbutton = analogRead(reset);
+
 
   // // If a user has connected
   if (clearDisplayQR == false){
@@ -759,10 +786,10 @@ void loop() {
     checkAndReconnectWiFi();
   }
 // button force wifi reset 
-  if (analogValue > 2300 && analogValue < 2800 && pressed == false && WiFi.status() == WL_CONNECTED){
+  if (resetbutton > 2300 && resetbutton < 2800 && pressed == false && WiFi.status() == WL_CONNECTED){
     Serial.print("network dissconnected");
     Serial.print(" button value: ");
-    Serial.println(analogValue);
+    Serial.println(resetbutton);
     preferences.begin("credentials", false);
     preferences.clear();
     preferences.end();
@@ -805,3 +832,4 @@ void loop() {
   wasConnected = isConnected;
 
 }
+
