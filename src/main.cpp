@@ -12,7 +12,7 @@
 #include "esp_sntp.h"
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
-
+#include <ArduinoJson.h>
 
 // Insert Firebase project API Key
 #define API_KEY "AIzaSyBmJ0ibz-8MF6HP7H3wJeKhxYx1Rwca17Y"
@@ -26,12 +26,7 @@ FirebaseConfig config;
 // Preferences
 Preferences preferences;
 
-// lcd
-// #define SCREEN_WIDTH 128 // OLED width,  in pixels
-// #define SCREEN_HEIGHT 64 // OLED height, in pixels
-// // create an OLED display object connected to I2C
-// Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-//animation
+//monitor 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE); 
 ani myAni;
 int counter = 0; 
@@ -59,26 +54,24 @@ String SSID;
 String PASS;
 WebServer server(80); // Create a WebServer object on port 80
 
-// bool to run once
-//for checkAndReconnectWiFi
-bool reconnectAttempted = false; 
-//for loop
-bool wasConnected = false;
+// flag
+bool reconnectAttempted = false;  //for checkAndReconnectWiFi
+bool wasConnected = false; //for loop
 bool pressed = false;
 unsigned long sendDataPrevMillis = 0;
 bool signupOK = false;
-// qr
-bool userConnectedToESP = false;
+bool userConnectedToESP = false; // qr
 bool messageDisplayed = false;
 bool clearDisplayQR = true;
-//time 
-const char* ntpServer = "asia.pool.ntp.org";
-const long  gmtOffset_sec = 8 * 3600; // Philippines is GMT +8
-const int   daylightOffset_sec = 0; // No daylight saving time in Philippines
+
 // LED Strips
 #define NUM_LEDS 5 // How many leds in your strip?
 #define DATA_PIN 16
 CRGB leds[NUM_LEDS]; // Define the array of leds
+//time 
+const char* ntpServer = "asia.pool.ntp.org";
+const long  gmtOffset_sec = 8 * 3600; // Philippines is GMT +8
+const int   daylightOffset_sec = 0; // No daylight saving time in Philippines
 
 void setTime(){
   struct tm timeinfo;
@@ -135,10 +128,192 @@ void setTime(){
    u8g2.drawStr(5,45,countdownStringBuff); 
 }
 
+// scan wifi ssid
+void handleScanWiFi() {
+  WiFi.disconnect();
+  delay(100);  // Smal
+  int n = WiFi.scanNetworks();
+  Serial.print("scaning");
+  DynamicJsonDocument doc(1024);
+  JsonArray array = doc.to<JsonArray>();
+  for (int i = 0; i < n; ++i) {
+    Serial.println(WiFi.SSID(i));
+    array.add(WiFi.SSID(i));
+  }
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
+}
 
 // website
-
 void handleRoot() {
+
+    String html = "<!DOCTYPE html>\
+    <html>\
+    <head>\
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\
+        <style>\
+            body {\
+                font-family: Arial, sans-serif;\
+                margin: 0;\
+                padding: 0;\
+            }\
+            .center-form {\
+                display: flex;\
+                flex-direction: column;\
+                justify-content: center;\
+                align-items: center;\
+                height: 100vh;\
+            }\
+            .center-form form {\
+                width: 80%;\
+                max-width: 300px;\
+                font-size: 0.9em;\
+                text-align: center;\
+                margin-top: 20px;\
+            }\
+            h1 {\
+                font-size: 1.5em;\
+            }\
+            p {\
+                font-size: 0.8em;\
+                text-align: center;\
+            }\
+            input[type=\"text\"],\
+            input[type=\"password\"] {\
+                width: calc(100% - 20px);\
+                height: 25px;\
+                font-size: 0.9em;\
+                margin-bottom: 10px;\
+                padding: 5px;\
+            }\
+            select {\
+                width: calc(100% - 20px);\
+                height: 30px;\
+                font-size: 0.9em;\
+                margin-bottom: 10px;\
+                padding: 5px;\
+            }\
+            input[type=\"submit\"] {\
+                width: 100%;\
+                height: 30px;\
+                font-size: 0.9em;\
+                background-color: #4CAF50;\
+                color: white;\
+                border: none;\
+                cursor: pointer;\
+            }\
+            button.refresh {\
+                width: 30%;\
+                height: 40px;\
+                font-size: 1em;\
+                color: black;\
+                border-radius: 8px;\
+                border: none;\
+                cursor: pointer;\
+                margin-top: 3px;\
+                margin-bottom: 3px;\
+            }\
+            button.submit:hover {\
+                background-color: #45a049; /* Darker green on hover */\
+            }\
+            #loading {\
+                display: none;\
+                position: fixed;\
+                width: 100%;\
+                height: 100%;\
+                top: 0;\
+                left: 0;\
+                right: 0;\
+                bottom: 0;\
+                background-color: rgba(255, 255, 255, 0.8);\
+                z-index: 9999;\
+                text-align: center;\
+                padding-top: 200px;\
+                font-size: 1.5em;\
+            }\
+            @media only screen and (max-width: 600px) {\
+                .center-form form {\
+                    font-size: 0.8em;\
+                }\
+                h1 {\
+                    font-size: 1.2em;\
+                }\
+                p {\
+                    font-size: 0.7em;\
+                }\
+                input[type=\"text\"],\
+                input[type=\"password\"] {\
+                    height: 30px;\
+                    font-size: 0.8em;\
+                }\
+                select {\
+                    height: 35px;\
+                    font-size: 0.8em;\
+                }\
+                button.refresh {\
+                    height: 30px;\
+                    font-size: 0.8em;\
+                }\
+                button.submit {\
+                    width: calc(100% - 20px);\
+                    height: 40px; /* Increased height for the submit button */\
+                    font-size: 1em; /* Larger font size for better readability */\
+                    background-color: #4CAF50;\
+                    color: white;\
+                    border: none;\
+                    cursor: pointer;\
+                    margin-top: 10px;\
+                }\
+            }\
+        </style>\
+        <script>\
+            function refreshNetworks() {\
+                document.getElementById('loading').style.display = 'block';\
+                var xhr = new XMLHttpRequest();\
+                xhr.open('GET', '/scanwifi', true);\
+                xhr.onload = function () {\
+                    if (xhr.status === 200) {\
+                        var networks = JSON.parse(xhr.responseText);\
+                        var selectElement = document.getElementById('ssid');\
+                        selectElement.innerHTML = '';\
+                        networks.forEach(function(network) {\
+                            var option = document.createElement('option');\
+                            option.text = network;\
+                            selectElement.add(option);\
+                        });\
+                        document.getElementById('loading').style.display = 'none';\
+                    } else {\
+                        alert('Failed to scan networks.');\
+                        document.getElementById('loading').style.display = 'none';\
+                    }\
+                };\
+                xhr.send();\
+            }\
+            document.addEventListener('DOMContentLoaded', refreshNetworks); // Automatically refresh networks on page load\
+        </script>\
+    </head>\
+    <body>\
+        <div id=\"loading\">Scanning for networks...</div>\
+        <div class=\"center-form\" id=\"content\">\
+            <h1>Please Enter your Wifi Credentials</h1>\
+            <p>Please select your Wifi SSID and enter the Password:</p>\
+            <form action=\"/submit\" method=\"POST\">\
+                Wifi SSID:<br>\
+                <select name=\"Wifi SSID\" id=\"ssid\"></select><br>\
+                <button type=\"button\" class=\"refresh\" onclick=\"refreshNetworks()\">Refresh</button><br>\
+                Password:<br>\
+                <input type=\"password\" name=\"Password\"><br><br>\
+                <input type=\"submit\" class=\"submit\" value=\"Submit\">\
+            </form>\
+        </div>\
+    </body>\
+    </html>";
+
+    server.send(200, "text/html", html);
+}
+
+void handleError() {
   String html = "<!DOCTYPE html>\
   <html>\
   <head>\
@@ -146,209 +321,30 @@ void handleRoot() {
     <style>\
       body {\
         font-family: Arial, sans-serif;\
-        margin: 0;\
-        padding: 0;\
-      }\
-      .center-form {\
         display: flex;\
-        flex-direction: column;\
         justify-content: center;\
         align-items: center;\
         height: 100vh;\
+        margin: 0;\
       }\
-      .center-form form {\
-        width: 80%;\
-        max-width: 300px;\
-        font-size: 0.9em;\
+      .center {\
         text-align: center;\
-      }\
-      h1 {\
-        font-size: 1.5em;\
-      }\
-      p {\
-        font-size: 0.8em;\
-        text-align: center;\
-      }\
-      input[type=\"text\"],\
-      input[type=\"password\"] {\
-        width: calc(100% - 20px);\
-        height: 25px;\
-        font-size: 0.9em;\
-        margin-bottom: 10px;\
-        padding: 5px;\
-      }\
-      select {\
-        width: calc(100% - 20px);\
-        height: 30px;\
-        font-size: 0.9em;\
-        margin-bottom: 10px;\
-        padding: 5px;\
-      }\
-      input[type=\"submit\"] {\
-        width: 100%;\
-        height: 30px;\
-        font-size: 0.9em;\
-        background-color: #4CAF50;\
-        color: white;\
-        border: none;\
-        cursor: pointer;\
-      }\
-      #loading {\
-        display: none;\
-        position: fixed;\
-        width: 100%;\
-        height: 100%;\
-        top: 0;\
-        left: 0;\
-        right: 0;\
-        bottom: 0;\
-        background-color: rgba(255, 255, 255, 0.8);\
-        z-index: 9999;\
-        text-align: center;\
-        padding-top: 200px;\
-        font-size: 1.5em;\
-      }\
-      @media only screen and (max-width: 600px) {\
-        .center-form form {\
-          font-size: 0.8em;\
-        }\
-        h1 {\
-          font-size: 1.2em;\
-        }\
-        p {\
-          font-size: 0.7em;\
-        }\
-        input[type=\"text\"],\
-        input[type=\"password\"] {\
-          height: 30px;\
-          font-size: 0.8em;\
-        }\
-        select {\
-          height: 35px;\
-          font-size: 0.8em;\
-        }\
-        input[type=\"submit\"] {\
-          height: 40px;\
-          font-size: 0.8em;\
-        }\
       }\
     </style>\
     <script>\
-      function refreshNetworks() {\
-        document.getElementById('loading').style.display = 'block';\
-        location.reload();\
-      }\
+      setTimeout(function() {\
+        window.location.href = '/';\
+      }, 1000);\
     </script>\
   </head>\
   <body>\
-    <div id=\"loading\">Scanning for networks...</div>\
-    <div class=\"center-form\" id=\"content\">\
-      <h1>Please Enter your Wifi Credentials</h1>\
-      <p>Please select your Wifi SSID and enter the Password:</p>\
-      <form action=\"/submit\" method=\"POST\">\
-        Wifi SSID:<br>\
-        <select name=\"Wifi SSID\">";
-        int n = WiFi.scanNetworks();
-        for (int i = 0; i < n; ++i) {
-          html += "<option value=\"" + WiFi.SSID(i) + "\">" + WiFi.SSID(i) + "</option>";
-        }
-        html += "</select><br>\
-        <button onclick=\"refreshNetworks()\">Refresh</button>\
-              Password:<br>\
-              <input type=\"password\" name=\"Password\"><br><br>\
-              <input type=\"submit\" value=\"Submit\">\
-            </form>\
-          </div>\
-        </body>\
-        </html>";
-    server.send(200, "text/html", html);
-}
-
-void Wrong() {
-  String tryAgain = "<!DOCTYPE html>\
-  <html>\
-  <head>\
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\
-    <style>\
-      body {\
-        font-family: Arial, sans-serif;\
-        margin: 0;\
-        padding: 0;\
-      }\
-      .center-form {\
-        display: flex;\
-        flex-direction: column;\
-        justify-content: center;\
-        align-items: center;\
-        height: 100vh;\
-      }\
-      .center-form form {\
-        width: 80%;\
-        max-width: 300px;\
-        font-size: 0.9em;\
-        text-align: center;\
-      }\
-      h1 {\
-        font-size: 1.5em;\
-      }\
-      p {\
-        font-size: 0.8em;\
-        text-align: center;\
-      }\
-      input[type=\"text\"],\
-      input[type=\"password\"] {\
-        width: calc(100% - 20px);\
-        height: 25px;\
-        font-size: 0.9em;\
-        margin-bottom: 10px;\
-        padding: 5px;\
-      }\
-      input[type=\"submit\"] {\
-        width: 100%;\
-        height: 30px;\
-        font-size: 0.9em;\
-        background-color: #4CAF50;\
-        color: white;\
-        border: none;\
-        cursor: pointer;\
-      }\
-      @media only screen and (max-width: 600px) {\
-        .center-form form {\
-          font-size: 0.8em;\
-        }\
-        h1 {\
-          font-size: 1.2em;\
-        }\
-        p {\
-          font-size: 0.7em;\
-        }\
-        input[type=\"text\"],\
-        input[type=\"password\"] {\
-          height: 30px;\
-          font-size: 0.8em;\
-        }\
-        input[type=\"submit\"] {\
-          height: 40px;\
-          font-size: 0.8em;\
-        }\
-      }\
-    </style>\
-  </head>\
-  <body>\
-    <div class=\"center-form\">\
-      <h1>Try Again Wrong SSID/Password</h1>\
-      <p>Please enter the correct Wifi SSID and Password:</p>\
-      <form action=\"/submit\" method=\"POST\">\
-        Wifi SSID:<br>\
-        <input type=\"text\" name=\"Wifi SSID\"><br>\
-        Password:<br>\
-        <input type=\"text\" name=\"Password\"><br><br>\
-        <input type=\"submit\" value=\"Submit\">\
-      </form>\
+    <div class=\"center\">\
+      <h1>Error</h1>\
+      <p>The password is incorrect. Redirecting to the main page...</p>\
     </div>\
   </body>\
   </html>";
-  server.send(200, "text/html", tryAgain);
+  server.send(200, "text/html", html);
 }
 
 void handleWiFiConnected() {
@@ -403,6 +399,7 @@ void handleWiFiConnected() {
   </html>";
   server.send(200, "text/html", success);
 }
+
 // end website
 
 // start webserver
@@ -440,9 +437,10 @@ void handleSubmit() {
     WiFi.begin(SSID.c_str(), PASS.c_str());
     unsigned long startMillis = millis();  
     while (WiFi.status() != WL_CONNECTED) {
-      if (millis() - startMillis >= 15000) {  // If 15 seconds have passed
+      if (millis() - startMillis >= 10000) {  //  If 10 seconds have passed
         Serial.println("Failed to connect to WiFi after 15 seconds.");
-        Wrong();
+        server.sendHeader("Location", "/error", true);
+        server.send(302, "text/plain", "");
         break;
       }
       Serial.print(".");
@@ -456,7 +454,10 @@ void handleSubmit() {
       Serial.println(WiFi.localIP());
       handleWiFiConnected();
       fireBase();
-    } 
+    } else {
+      Serial.println("Incorrect password or SSID. Re-scanning networks.");
+      handleScanWiFi();  // Call handleScanWiFi to rescan networks
+    }
   }
 }
 
@@ -472,11 +473,17 @@ void webServerStart(){
   Serial.print("IP Address: ");
   Serial.println(IP);
 // Set up server routes
-  server.on("/", handleRoot);
-  server.on("/submit", HTTP_POST, handleSubmit);
+
+    // Set up server routes
+    server.on("/", handleRoot);
+    server.on("/submit", HTTP_POST, handleSubmit);
+    server.on("/error", handleError); // Handle errors
+    server.on("/scanwifi", HTTP_GET, handleScanWiFi); // Use handleScanWiFi for /scanwifi
+
   server.onNotFound([]() {
     server.send(404, "text/plain", "404: Not found");
   });
+
 // Start server
   server.begin();
   Serial.println("HTTP server started");  
@@ -500,13 +507,10 @@ void SavedCredentials(){
 
     u8g2.clearBuffer();
 
-
-
     WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
     unsigned long startMillis = millis();  
     while (WiFi.status() != WL_CONNECTED) {
       if (savedSSID == "" || savedPASS == "" or millis() - startMillis >= 15000){
-        
         webServerStart();
         break;
       }
@@ -724,10 +728,34 @@ const unsigned char epd_bitmap_wifi [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+void timeToDrink(){
+    u8g2.clearBuffer();
+    u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
+    u8g2.drawStr(5,25,"time to drink:");
+    u8g2.drawStr(5,35,"time to drink");
+    // u8g2.print(" ");
+    // u8g2.print("biogesic"); //name of the med
+    u8g2.sendBuffer(); 
+}
 
+String  firstName(){
+if (Firebase.RTDB.getString(&fbdo, "usr/12345/first_name")) {
+  if (fbdo.dataType() == "string") {
+    String firstName = fbdo.stringData();
+    firstName.toUpperCase();
+    Serial.print("First Name: ");
+    Serial.println(firstName);
+    return firstName;
+}
+  } else {
+    Serial.print("FAILED");
+    Serial.print("REASON: ");
+    Serial.println(fbdo.errorReason());
+}
+return "";
+}
 
 void setup() {
-
 FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
 
   Serial.begin(115200);
@@ -747,46 +775,9 @@ FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
   u8g2.clearBuffer();
 }
 
-void timeToDrink(){
-    u8g2.clearBuffer();
-    u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
-    u8g2.drawStr(5,25,"time to drink:");
-    u8g2.drawStr(5,35,"time to drink");
-    // u8g2.print(" ");
-    // u8g2.print("biogesic"); //name of the med
-    u8g2.sendBuffer(); 
-}
-
-
-String  firstName(){
-if (Firebase.RTDB.getString(&fbdo, "usr/12345/first_name")) {
-  if (fbdo.dataType() == "string") {
-    String firstName = fbdo.stringData();
-    firstName.toUpperCase();
-    Serial.print("First Name: ");
-    Serial.println(firstName);
-    return firstName;
-}
-  } else {
-    Serial.print("FAILED");
-    Serial.print("REASON: ");
-    Serial.println(fbdo.errorReason());
-}
-return "";
-}
-
 
 void loop() {
   server.handleClient();
-
-
-  // leds[0] = CRGB::Green;
-  // FastLED.show();
-  // delay(1000);
-  // leds[0] = CRGB::Black;
-  // FastLED.show();
-  // delay(1000);
-  
   int currentStationCount = WiFi.softAPgetStationNum();
   bool isConnected = WiFi.status() == WL_CONNECTED; 
   server.handleClient();
@@ -794,38 +785,14 @@ void loop() {
 // save values for CD74HC4067 
   int value0 = channel0();
   // Serial.println(value0);
-  int resetbutton = analogRead(reset);
-
-
-  // // If a user has connected
-  if (clearDisplayQR == false){
-    u8g2.sendBuffer(); 
-    clearDisplayQR = true;
-  }
-  else if (currentStationCount >= 1 && !isConnected && userConnectedToESP == false) {
-    Serial.println("connected");
-    u8g2.clearBuffer();
-    u8g2.drawXBMP(0, 0, 128, 64, epd_bitmap_SCAN_TO_GO_WEBSITE);
-    u8g2.sendBuffer(); 
-    delay(1000);
-    userConnectedToESP = true;
-    messageDisplayed = false;
-  } else if (currentStationCount < 1 && !isConnected && messageDisplayed == false){
-    Serial.println("user has not connected to the ESP32 WiFi.");
-    u8g2.clearBuffer();
-    u8g2.drawXBMP(0, 0, 128, 64, epd_bitmap_scan_to_connect);
-    u8g2.sendBuffer(); 
-    messageDisplayed = true; // Set the flag to true after displaying the message
-    userConnectedToESP = false;
-  }
-
+  int resetbutton = digitalRead(reset);
 // check if wifi is interupted
   if (wasConnected && !isConnected) {
     Serial.println("Internet connection was interrupted.");
     checkAndReconnectWiFi();
   }
 // button force wifi reset 
-  if (resetbutton > 2300 && resetbutton < 2800 && pressed == false && WiFi.status() == WL_CONNECTED){
+  if (resetbutton == HIGH && pressed == false && WiFi.status() == WL_CONNECTED){
     Serial.print("network dissconnected");
     Serial.print(" button value: ");
     Serial.println(resetbutton);
@@ -836,7 +803,15 @@ void loop() {
     pressed = true;
   }
 
-  if(WiFi.status() == WL_CONNECTED){
+
+
+  
+
+
+
+
+
+  if (WiFi.status() == WL_CONNECTED && Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0 )){
     struct tm timeinfo;
     u8g2.clearBuffer();
     u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
@@ -846,10 +821,6 @@ void loop() {
     u8g2.print("Goodevening ");
     u8g2.print(firstName().c_str()); 
     u8g2.sendBuffer(); 
-    // timeToDrink();
-  }
-
-  if (WiFi.status() == WL_CONNECTED && Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0 )){
 
     sendDataPrevMillis = millis();
     int value0 = channel0();
