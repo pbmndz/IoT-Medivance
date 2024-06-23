@@ -27,7 +27,7 @@ FirebaseConfig config;
 Preferences preferences;
 
 //monitor 
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE); 
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0);
 ani myAni;
 int counter = 0; 
 
@@ -38,6 +38,11 @@ int counter = 0;
 #define S3 0
 #define SIG 36
 // button 
+// menu
+#define BUTTON_UP_PIN 35 // pin for UP button 
+#define BUTTON_SELECT_PIN 32 // pin for SELECT button
+#define BUTTON_DOWN_PIN 33 // pin for DOWN button
+
 //reset
 const int reset = 39; 
 
@@ -45,7 +50,6 @@ const int reset = 39;
 const int stopButton = 34; 
 
 // Wifi //
-// Replace with your network credentials 
 // local wifi
 const char* ssid = "DoseRx";
 const char* password = "DoseRx123!";
@@ -63,6 +67,21 @@ bool signupOK = false;
 bool userConnectedToESP = false; // qr
 bool messageDisplayed = false;
 bool clearDisplayQR = true;
+
+// menu
+
+int button_up_clicked = 0; // only perform action when button is clicked, and wait until another press
+int button_select_clicked = 0; // same as above
+int button_down_clicked = 0; // same as above
+int item_selected = 0; // which item in the menu is selected
+int item_sel_previous; // previous item - used in the menu screen to draw the item before the selected one
+int item_sel_next; // next item - used in the menu screen to draw next item after the selected one
+int current_screen = 0;   // 0 = menu, 1 = screenshot, 2 = qr
+int demo_mode = 0; // when demo mode is set to 1, it automatically goes over all the screens, 0 = control menu with buttons
+int demo_mode_state = 0; // demo mode state = which screen and menu item to display
+int demo_mode_delay = 0; // demo mode delay = used to slow down the screen switching
+
+
 
 // LED Strips
 #define NUM_LEDS 5 // How many leds in your strip?
@@ -147,8 +166,7 @@ void handleScanWiFi() {
 
 // website
 void handleRoot() {
-
-    String html = "<!DOCTYPE html>\
+    const char* html = "<!DOCTYPE html>\
     <html>\
     <head>\
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\
@@ -314,7 +332,7 @@ void handleRoot() {
 }
 
 void handleError() {
-  String html = "<!DOCTYPE html>\
+  const char* html = "<!DOCTYPE html>\
   <html>\
   <head>\
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\
@@ -348,7 +366,7 @@ void handleError() {
 }
 
 void handleWiFiConnected() {
-  String success = "<!DOCTYPE html>\
+  const char* success = "<!DOCTYPE html>\
   <html>\
   <head>\
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\
@@ -389,11 +407,18 @@ void handleWiFiConnected() {
           font-size: 0.9 em;\
         }\
     </style>\
+    <script>\
+      function closeWindow() {\
+        window.open('', '_self', '');\
+        window.close();\
+      }\
+    </script>\
   </head>\
   <body>\
     <div class=\"center-form\">\
       <h1>DoseRx is Connected</h1>\
       <p>you may now close the browser and reconnect to your wifi</p>\
+      <button onclick=\"closeWindow()\">Close</button>\
     </div>\
   </body>\
   </html>";
@@ -552,9 +577,25 @@ void checkAndReconnectWiFi() {
   }
 }
 
+const char* messages[] = {
+  "DoseRx Medivance",
+  "improves medication",
+  "management with ",
+  "advanced features",
+  " ",
+  "next --->"
+};
+const char* info[] = {
+  "device name: DoseRx",
+  "SSID: DoseRx",
+  "PASSWORD: DoseRx123",
+  " ",
+  " ",
+  "next --->"
+};
+
 // display
 void animation(){
-  // animation
   while(true) { 
     u8g2.clearBuffer(); 
     u8g2.drawXBMP(0, 0, 128, 64, myAni.getBitmap(counter));
@@ -562,6 +603,7 @@ void animation(){
     counter = (counter + 1) % 42; 
     if (counter == 41) { 
       delay(1000); 
+      u8g2.clearBuffer(); 
       break;
     }
   }
@@ -728,6 +770,79 @@ const unsigned char epd_bitmap_wifi [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+// menu
+// 'icon_offline', 16x16px
+const unsigned char epd_bitmap_icon_offline [] PROGMEM = {
+	0x00, 0x00, 0x00, 0x60, 0x00, 0x30, 0xf0, 0x0f, 0x38, 0x1c, 0x06, 0x7e, 0xc2, 0x47, 0xf0, 0x0e, 
+	0x98, 0x19, 0xc8, 0x10, 0xc0, 0x03, 0x60, 0x05, 0x30, 0x06, 0x98, 0x01, 0x8c, 0x01, 0x00, 0x00
+};
+// 'online', 16x16px
+const unsigned char epd_bitmap_online [] PROGMEM = {
+	0x00, 0x00, 0x00, 0x00, 0xe0, 0x03, 0xf8, 0x1f, 0xfc, 0x1f, 0x1e, 0x78, 0xe7, 0xe7, 0xf0, 0x0f, 
+	0x38, 0x1c, 0x98, 0x19, 0xc0, 0x07, 0x60, 0x0e, 0x00, 0x00, 0x80, 0x01, 0x80, 0x01, 0x00, 0x00
+};
+// 'icon_setings', 16x16px
+const unsigned char epd_bitmap_info [] PROGMEM = {
+	0xf0, 0x0f, 0xf8, 0x1f, 0x1c, 0x30, 0x06, 0x60, 0x82, 0x61, 0x83, 0xc1, 0x03, 0x80, 0xc3, 0xc1, 
+	0x83, 0xc1, 0x83, 0xc1, 0x83, 0xc1, 0xc3, 0xc3, 0x06, 0x70, 0x0c, 0x38, 0x18, 0x1e, 0xf0, 0x0f
+};
+
+// Array of all bitmaps for convenience. (Total bytes used to store images in PROGMEM = 144)
+const unsigned char* bitmap_icons[3] = {
+	epd_bitmap_icon_offline,
+	epd_bitmap_info,
+	epd_bitmap_online
+};
+
+// 'scrollbar_background', 8x64px
+const unsigned char bitmap_scrollbar_background [] PROGMEM = {
+  0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40,
+  0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40,
+  0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40,
+  0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40,
+  0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40,
+  0x00, 0x40, 0x00, 0x00, };
+// 'item_sel_outline', 128x21px
+const unsigned char bitmap_item_sel_outline [] PROGMEM = {
+  0xF8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x02, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C,
+  0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x0C, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x02, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C,
+  0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x0C, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x02, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C,
+  0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x0C, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x02, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C,
+  0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x0C, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x02, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C,
+  0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x0C, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x02, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C,
+  0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x0C, 0xFC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x07, 0xF8, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x03,
+  };
+
+const int NUM_ITEMS = 3; // number of items in the list and also the number of screenshots and screenshots with QR codes (other screens)
+const int MAX_ITEM_LENGTH = 20; // maximum characters for the item name
+
+char menu_items [NUM_ITEMS] [MAX_ITEM_LENGTH] = {  // array with item names
+  { "offline" },
+  { "About" },
+  { "online" },
+ };
+
 void timeToDrink(){
     u8g2.clearBuffer();
     u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
@@ -756,89 +871,188 @@ return "";
 }
 
 void setup() {
-FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
-
   Serial.begin(115200);
-  u8g2.begin(); // start the u8g2 library
+  u8g2.begin();
+  u8g2.setColorIndex(1);  
+  u8g2.setBitmapMode(1);
+  FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
   // CD74HC4067
   pinMode(S0, OUTPUT);
   pinMode(S1, OUTPUT);
   pinMode(S2, OUTPUT);
   pinMode(S3, OUTPUT);
   pinMode(SIG, INPUT);
-      // Start WiFi scan
+
+  pinMode(BUTTON_UP_PIN, INPUT_PULLUP); // up button
+  pinMode(BUTTON_SELECT_PIN, INPUT_PULLUP); // select button
+  pinMode(BUTTON_DOWN_PIN, INPUT_PULLUP); // down button
+  
   Serial.println("Starting WiFi scan...");
   WiFi.mode(WIFI_STA);
 
   SavedCredentials();
   animation();
-  u8g2.clearBuffer();
+
 }
+
 
 
 void loop() {
   server.handleClient();
   int currentStationCount = WiFi.softAPgetStationNum();
   bool isConnected = WiFi.status() == WL_CONNECTED; 
-  server.handleClient();
-
 // save values for CD74HC4067 
   int value0 = channel0();
   // Serial.println(value0);
-  int resetbutton = digitalRead(reset);
-// check if wifi is interupted
-  if (wasConnected && !isConnected) {
-    Serial.println("Internet connection was interrupted.");
-    checkAndReconnectWiFi();
-  }
-// button force wifi reset 
-  if (resetbutton == HIGH && pressed == false && WiFi.status() == WL_CONNECTED){
-    Serial.print("network dissconnected");
-    Serial.print(" button value: ");
-    Serial.println(resetbutton);
-    preferences.begin("credentials", false);
-    preferences.clear();
-    preferences.end();
-    WiFi.disconnect();
-    pressed = true;
-  }
 
 
 
-  
-
-
-
-
-
-  if (WiFi.status() == WL_CONNECTED && Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0 )){
-    struct tm timeinfo;
-    u8g2.clearBuffer();
-    u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
-    setTime();   
-    u8g2.setCursor(5,55);
-    //make a gm gn and afternoon 
-    u8g2.print("Goodevening ");
-    u8g2.print(firstName().c_str()); 
-    u8g2.sendBuffer(); 
-
-    sendDataPrevMillis = millis();
-    int value0 = channel0();
-    pressed = false;
-    if (Firebase.RTDB.setInt(&fbdo, "usr/12345/sensor_value/slot_1", value0)){
-      Serial.println();
-      Serial.print(value0);
-      Serial.print(" success: " );
-      Serial.print(fbdo.dataPath());
-      Serial.print(" TYPE: " );
-      Serial.println(fbdo.dataType());
-    }else {
-      Serial.print("FAILED");
-      Serial.print("REASON: " );
-      Serial.println(fbdo.errorReason());
+  if (current_screen == 0) { // MENU SCREEN
+      if ((digitalRead(BUTTON_UP_PIN) == LOW) && (button_up_clicked == 0)) { // up button clicked - jump to previous menu item
+        item_selected = item_selected - 1; // select previous item
+        button_up_clicked = 1; // set button to clicked to only perform the action once
+        if (item_selected < 0) { // if first item was selected, jump to last item
+          item_selected = NUM_ITEMS-1;
+        }
       }
-    }
-  // Update the the data 
-  wasConnected = isConnected;
+      else if ((digitalRead(BUTTON_DOWN_PIN) == LOW) && (button_down_clicked == 0)) { // down button clicked - jump to next menu item
+        item_selected = item_selected + 1; // select next item
+        button_down_clicked = 1; // set button to clicked to only perform the action once
+        if (item_selected >= NUM_ITEMS) { // last item was selected, jump to first menu item
+          item_selected = 0;
+          }
+      } 
+      if ((digitalRead(BUTTON_UP_PIN) == HIGH) && (button_up_clicked == 1)) { // unclick 
+        button_up_clicked = 0;
+      }
+      if ((digitalRead(BUTTON_DOWN_PIN) == HIGH) && (button_down_clicked == 1)) { // unclick
+        button_down_clicked = 0;
+      }
+  }
+  if ((digitalRead(BUTTON_SELECT_PIN) == LOW) && (button_select_clicked == 0)) { // select button clicked, jump between screens
+     button_select_clicked = 1; // 
+     if (current_screen == 0) { // menu items screen --> functions
+        current_screen = 1;
+      } 
+      else if (current_screen == 1  && item_selected == 1) {current_screen = 2;} //settings 
+     else {current_screen = 0;} // last screen --> menu items screen
+  }
+  if ((digitalRead(BUTTON_SELECT_PIN) == HIGH) && (button_select_clicked == 1)) { // unclick 
+    button_select_clicked = 0;
+  }
+  // set correct values for the previous and next items
+  item_sel_previous = item_selected - 1;
+  if (item_sel_previous < 0) {item_sel_previous = NUM_ITEMS - 1;} // previous item would be below first = make it the last
+  item_sel_next = item_selected + 1;  
+  if (item_sel_next >= NUM_ITEMS) {item_sel_next = 0;} // next item would be after last = make it the first
+  u8g2.clearBuffer();  // clear buffer for storing display content in RAM
+    if (current_screen == 0) { // MENU SCREEN
+      // selected item background
+      u8g2.drawXBMP(0, 22, 128, 21, bitmap_item_sel_outline);
+      // draw previous item as icon + label
+      u8g2.setFont(u8g_font_7x14);
+      u8g2.drawStr(25, 15, menu_items[item_sel_previous]); 
+      u8g2.drawXBMP( 4, 2, 16, 16, bitmap_icons[item_sel_previous]);          
+      // draw selected item as icon + label in bold font
+      u8g2.setFont(u8g_font_7x14B);    
+      u8g2.drawStr(25, 15+20+2, menu_items[item_selected]);   
+      u8g2.drawXBMP( 4, 24, 16, 16, bitmap_icons[item_selected]);     
+      // draw next item as icon + label
+      u8g2.setFont(u8g_font_7x14);     
+      u8g2.drawStr(25, 15+20+20+2+2, menu_items[item_sel_next]);   
+      u8g2.drawXBMP( 4, 46, 16, 16, bitmap_icons[item_sel_next]);  
+      // draw scrollbar background
+      u8g2.drawXBMP(128-8, 0, 8, 64, bitmap_scrollbar_background);
+      // draw scrollbar handle
+      u8g2.drawBox(125, 64/NUM_ITEMS * item_selected, 3, 64/NUM_ITEMS); 
+      u8g2.sendBuffer(); 
+    } 
+    else if (current_screen == 1 and item_selected == 2) { // wifi
+      int resetbutton = analogRead(reset);
+    // check if wifi is interupted
+      if (wasConnected && !isConnected) {
+        Serial.println("Internet connection was interrupted.");
+        checkAndReconnectWiFi();
+      }
+      if (!clearDisplayQR){
+            u8g2.sendBuffer(); 
+            clearDisplayQR = true;
+        }
+      else if (currentStationCount >= 1 && WiFi.status() != WL_CONNECTED) {
+            Serial.println("user connected");
+            u8g2.drawXBMP( 0, 0, 128, 64, epd_bitmap_SCAN_TO_GO_WEBSITE);
+      } 
+      else if (currentStationCount < 1 && WiFi.status() != WL_CONNECTED){
+            Serial.println("user has not connected to the ESP32 WiFi.");
+            u8g2.drawXBMP(0, 0, 128, 64, epd_bitmap_scan_to_connect);
+      }   
+      if (resetbutton == 4095 && WiFi.status() == WL_CONNECTED){
+        Serial.print("network dissconnected");
+        Serial.print(" button value: ");
+        Serial.println(resetbutton);
+        preferences.begin("credentials", false);
+        preferences.clear();
+        preferences.end();
+        WiFi.disconnect();
+        // pressed = true;
+      }else if (WiFi.status() == WL_CONNECTED && Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0 )){
+        
+        Serial.println(resetbutton);
+            struct tm timeinfo;
+            u8g2.clearBuffer();
+            u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
+            setTime();   
+            u8g2.setCursor(5,55);
+            //make a gm gn and afternoon 
+            u8g2.print("Goodevening ");
+            u8g2.print(firstName().c_str()); 
+            u8g2.sendBuffer(); 
+
+            sendDataPrevMillis = millis();
+            int value0 = channel0();
+            pressed = false;
+            if (Firebase.RTDB.setInt(&fbdo, "usr/12345/sensor_value/slot_1", value0)){
+              Serial.println();
+              Serial.print(value0);
+              Serial.print(" success: " );
+              Serial.print(fbdo.dataPath());
+              Serial.print(" TYPE: " );
+              Serial.println(fbdo.dataType());
+            }else {
+              Serial.print("FAILED");
+              Serial.print("REASON: " );
+              Serial.println(fbdo.errorReason());
+            }
+          }
+        // Update the the data 
+      wasConnected = isConnected;
+
+}   
+    else if (current_screen == 1 && item_selected == 2){ //offline  
+    // offline
+
+}
+    else if (current_screen == 1 && item_selected == 1){ //settings 
+      u8g2.setFont(u8g_font_6x10);   
+      for (int i = 0; i < 6; ++i) {
+        if (i < 6) {
+            u8g2.drawStr(3, 12 + 10 * i, messages[i]);  
+        }
+      }
+}
+    else if (current_screen == 2 && item_selected == 1){ //settings 
+      u8g2.setFont(u8g_font_6x10);   
+      for (int i = 0; i < 6; ++i) {
+        if (i < 6) {
+            u8g2.drawStr(3, 12 + 10 * i, info[i]);  // Adjust vertical spacing accordingly
+        }
+      }
+
+      // Send buffer to the display
+      u8g2.sendBuffer();
+
+
+}
+  u8g2.sendBuffer(); // send buffer from RAM to display controller
 
 }
