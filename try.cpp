@@ -44,27 +44,25 @@ int counter = 0;
 #define BUTTON_UP_PIN 35 // pin for UP button 
 #define BUTTON_SELECT_PIN 32 // pin for SELECT button
 #define BUTTON_DOWN_PIN 33 // pin for DOWN button
-
+#define BUTTON_STOP_PIN 34
 int buzzer = 12; // buzzer pin
 
 //reset
 const int reset = 39; 
 
 // stop
-const int BUTTON_STOP_PIN = 34; 
+
 
 //offline 
-int seconds = 0;
-int minutes = 0;
-int hours = 0;
+int tseconds = 0;
+int tminutes = 0;
+int thours = 0;
 int last_seconds = 0;
 int last_minutes = 0;
 int last_hours = 0;
 int set = 0;
-bool condition_set = 0;
-bool condition_reset = 0;
+int flag1=0, flag2=0;
 
-unsigned long lastmillis; 
 
 
 // Wifi //
@@ -101,7 +99,7 @@ int demo_mode_delay = 0; // demo mode delay = used to slow down the screen switc
 
 // Define variables to track button press timing
 unsigned long button_press_time = 0;
-const unsigned long long_press_duration = 3000; // Adjust the duration as needed (in milliseconds)
+const unsigned long long_press_duration = 8000; // Adjust the duration as needed (in milliseconds)
 
 // LED Strips
 #define NUM_LEDS 5 // How many leds in your strip?
@@ -469,9 +467,9 @@ void handleSubmit() {
   if(server.method() == HTTP_POST) {
     String SSID = server.arg("Wifi SSID");
     String PASS = server.arg("Password");
-    Serial.println("SSID: ");
+    Serial.print("SSID: ");
     Serial.println(SSID);
-    Serial.println("PASS: ");
+    Serial.print("PASS: ");
     Serial.println(PASS);
 
     preferences.begin("credentials", false);
@@ -897,17 +895,19 @@ if (Firebase.RTDB.getString(&fbdo, "usr/12345/first_name")) {
 return "";
 }
 
-void print_time() {
-  seconds = seconds -1;
-if (seconds < 0) {
-  seconds = 59;
-  hours = hours -1;
+
+void print_time(){
+tseconds = tseconds-1;
+if(tseconds<0){tseconds=59; tminutes = tminutes-1;}
+if(tminutes<0){tminutes=59; thours = thours-1;}
 }
-if (minutes < 0) {
-  minutes = 59;
-  hours = hours - 1;
-  } 
+
+ //LCD DISPLAY WHEN DONE
+void tdownComplete() {
+  Serial.print("ok");
 }
+
+
 void setup() {
   Serial.begin(115200);
   u8g2.begin();
@@ -928,14 +928,13 @@ void setup() {
   pinMode(BUTTON_STOP_PIN, INPUT_PULLUP);
   pinMode(buzzer, OUTPUT);
   Serial.println("Starting WiFi scan...");
-  tdown.setInterval(print_time, 999);
   WiFi.mode(WIFI_STA);
+  print_time();
+  tdown.setInterval(print_time, 999);
   SavedCredentials();
   animation();
 
-
 }
-
 void loop() {
   server.handleClient();
   int currentStationCount = WiFi.softAPgetStationNum();
@@ -1080,135 +1079,86 @@ void loop() {
 }   
 
     else if (current_screen == 1 && item_selected == 0){ //offline 
-                                    //  for offline function
+                  //  for offline function
+    if(digitalRead (BUTTON_SELECT_PIN) == 0){
+    Serial.println("select");
 
-                  if (digitalRead (BUTTON_SELECT_PIN) == 0 ) {
-                    condition_set = 1;
-                    set = set +1;
-                    if (set > 3) {
-                      set = 0;
-                    }
-                    delay(100);
-                  }
-                  } else {
-                    condition_set = 0;
-                  }
+    if(flag1==0 && flag2==0){flag1=1;
+    set = set+1;
+    if(set>3){set=0;}
+    delay(100); 
+    }
+    }else{flag1=0;}
+//increasing number
+  if(digitalRead (BUTTON_UP_PIN) == 0){
+    Serial.println("up");
+    if(set==0){flag2=1;}
+    if(set==0){flag2=0;}
+    if(set==0){flag2=1;}
+    if(set==1){tseconds++;}
+    if(set==2){tminutes++;}
+    if(set==3){thours++;}
+    if(tseconds>59){tseconds=0;}
+    if(tminutes>59){tminutes=0;}
+    if(thours>99){thours=0;}
+    delay(200);
+}//decreasing number
+  if(digitalRead (BUTTON_DOWN_PIN) == 0){
+    Serial.println("down");
+    if(set==0){flag2=0;}
+    if(set==1){tseconds--;}
+    if(set==2){tminutes--;}
+    if(set==3){thours--;}
+    if(tseconds<0){tseconds=59;}
+    if(tminutes<0){tminutes=59;}
+    if(thours<0){thours=99;}
+    delay(200); 
+}
+  if(digitalRead (BUTTON_STOP_PIN) == 0){ 
+    Serial.println("start buttion");
 
-                  if (digitalRead(BUTTON_UP_PIN) == 0 ) {
-                    if (set == 0) {
-                      tdown.start();
-                    }
-                  if (set == 1) {
-                    seconds++;
-                    last_seconds == seconds;
-                  }
-                  if (set == 2) {
-                    seconds++;
-                    last_minutes == minutes;
-                  }
-                  if (set == 3) {
-                    seconds++;
-                    last_hours == hours;
-                  }
-                  if (seconds > 59) {
-                    seconds = 0;
-                  }
-                  if (minutes > 59) {
-                    minutes = 0;
-                  }
-                  if (hours > 59) {
-                    hours = 0;
-                  }
-                  delay(200);
-                  }
-                  if (digitalRead (BUTTON_DOWN_PIN) == 0 ) {
-                    lastmillis = millis();
-                    condition_reset = 0;
-                    while (digitalRead (BUTTON_DOWN_PIN) == 0 && set == 0) {
-                      if (millis() - lastmillis > 500) {
-                        condition_reset = 1;
-                        tdown.stop();
-                        seconds = last_seconds;
-                        minutes = last_minutes;
-                        hours = last_hours;
+    if (flag2=0){
+    tdown.start();
+    flag2=1;
+    }
+    else {
+    tdown.stop();
+      flag2=0;
+    }
+}
+    u8g2.setCursor(5,55);
+      if(set==0){u8g2.print("      Timer     ");}
+      if(set==1){u8g2.print("  Set Timer SS  ");}
+      if(set==2){u8g2.print("  Set Timer MM  ");}
+      if(set==3){u8g2.print("  Set Timer HH  ");}
+  
+      //screen display timer
+  u8g2.setCursor(5,35);
+  if(thours<=9){u8g2.print("0");}
+  u8g2.print(thours);
+  u8g2.print(":");
+  if(tminutes<=9){u8g2.print("0");}
+  u8g2.print(tminutes);
+  u8g2.print(":");
+  if(tseconds<=9){u8g2.print("0");}
+  u8g2.print(tseconds);
+  u8g2.print("   ");
 
-                        u8g2.setCursor(5,55);
-                        if(hours <=9) {
-                          u8g2.print("0");
-                        }
-                        u8g2.print(hours);
-                        u8g2.print(":");
-                        if (minutes <= 9) {
-                          u8g2.print("0");
-                        }
-                        u8g2.print(minutes);
-                        u8g2.print(":");
-                        if (seconds <= 9) {
-                          u8g2.print("0");
-                        }
-                        u8g2.print(seconds);
-                        u8g2.print("   ");
-                        delay(100);
-                      }
-                    }
+  if(tseconds==0 && tminutes==0 && thours==0 && flag2==1){flag2=0;
+tdown.stop(); 
+digitalWrite(buzzer, HIGH);
+delay(300);
+digitalWrite(buzzer, LOW);
+delay(200);
+digitalWrite(buzzer, HIGH);
+delay(300);
+digitalWrite(buzzer, LOW);
+delay(200);
+digitalWrite(buzzer, HIGH);
+delay(300);
+digitalWrite(buzzer, LOW);
+}
 
-                    if (condition_reset == 0) {
-                      if (set == 0) {
-                        tdown.stop();
-                      }
-                      if (set == 1) {
-                        seconds--;
-                        last_seconds = seconds;
-                    }
-                    if (set == 2) {
-                        minutes--;
-                        last_minutes = minutes;
-                    }
-                    if (set == 3) {
-                        hours--;
-                        last_hours = hours;
-                    }
-                    if (seconds > 59) {
-                    seconds = 0;
-                  }
-                  if (minutes > 59) {
-                    minutes = 0;
-                  }
-                  if (hours > 59) {
-                    hours = 0;
-                  }
-                  delay(200);
-
-                  }
-                      u8g2.setCursor(5,55);
-                        if(set==0){u8g2.print("      Timer     ");}
-                        if(set==1){u8g2.print("  Set Timer SS  ");}
-                        if(set==2){u8g2.print("  Set Timer MM  ");}
-                        if(set==3){u8g2.print("  Set Timer HH  ");}
-                    
-                        //screen display timer
-                    u8g2.setCursor(5,55);
-                    if(hours<=9){u8g2.print("0");}
-                    u8g2.print(hours);
-                    u8g2.print(":");
-                    if(minutes<=9){u8g2.print("0");}
-                    u8g2.print(minutes);
-                    u8g2.print(":");
-                    if(seconds<=9){u8g2.print("0");}
-                    u8g2.print(seconds);
-                    u8g2.print("   ");
-                  tdown.stop(); 
-                  digitalWrite(buzzer, HIGH);
-                  delay(300);
-                  digitalWrite(buzzer, LOW);
-                  delay(200);
-                  digitalWrite(buzzer, HIGH);
-                  delay(300);
-                  digitalWrite(buzzer, LOW);
-                  delay(200);
-                  digitalWrite(buzzer, HIGH);
-                  delay(300);
-                  digitalWrite(buzzer, LOW);
                   
 }
     else if (current_screen == 1 && item_selected == 1){ //info 
