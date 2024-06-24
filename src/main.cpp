@@ -1028,8 +1028,8 @@ void loop() {
       wasConnected = isConnected;
 
 }   
-    else if (current_screen == 1 && item_selected == 2){ //offline  
-    // offline
+    else if (current_screen == 1 && item_selected == 2){ //offline       
+    //  for offline function
 
 }
     else if (current_screen == 1 && item_selected == 1){ //settings 
