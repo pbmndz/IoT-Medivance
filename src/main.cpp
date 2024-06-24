@@ -13,7 +13,12 @@
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 #include <ArduinoJson.h>
+#include <Arduino.h>
+#include "Countimer.h" 
+#include <EEPROM.h>
 
+#include "OneButton.h"
+#include "countimer.h"
 // Insert Firebase project API Key
 #define API_KEY "AIzaSyBmJ0ibz-8MF6HP7H3wJeKhxYx1Rwca17Y"
 // Insert RTDB URLefine the RTDB URL 
@@ -43,11 +48,17 @@ int counter = 0;
 #define BUTTON_SELECT_PIN 32 // pin for SELECT button
 #define BUTTON_DOWN_PIN 33 // pin for DOWN button
 
+OneButton BUTTON_SELECT_PIN(32,true);
+
 //reset
 const int reset = 39; 
 
 // stop
-const int stopButton = 34; 
+const int BUTTON_STOP_PIN = 34; 
+
+//offline 
+
+
 
 // Wifi //
 // local wifi
@@ -81,7 +92,9 @@ int demo_mode = 0; // when demo mode is set to 1, it automatically goes over all
 int demo_mode_state = 0; // demo mode state = which screen and menu item to display
 int demo_mode_delay = 0; // demo mode delay = used to slow down the screen switching
 
-
+// Define variables to track button press timing
+unsigned long button_press_time = 0;
+const unsigned long long_press_duration = 3000; // Adjust the duration as needed (in milliseconds)
 
 // LED Strips
 #define NUM_LEDS 5 // How many leds in your strip?
@@ -577,22 +590,28 @@ void checkAndReconnectWiFi() {
   }
 }
 
+// about 
 const char* messages[] = {
   "DoseRx Medivance",
   "improves medication",
   "management with ",
   "advanced features",
   " ",
-  "next --->"
+  "           next --->"
 };
 const char* info[] = {
-  "device name: DoseRx",
+  "Device name: DoseRx",
+  " ",
   "SSID: DoseRx",
   "PASSWORD: DoseRx123",
   " ",
-  " ",
-  "next --->"
+  "           next --->"
 };
+//offline
+
+
+
+
 
 // display
 void animation(){
@@ -627,6 +646,7 @@ int channel0() {
     //   return false;
     // }
 }
+
 
 const unsigned char epd_bitmap_scan_to_connect [] PROGMEM = {
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
@@ -870,6 +890,9 @@ if (Firebase.RTDB.getString(&fbdo, "usr/12345/first_name")) {
 return "";
 }
 
+
+
+
 void setup() {
   Serial.begin(115200);
   u8g2.begin();
@@ -886,9 +909,11 @@ void setup() {
   pinMode(BUTTON_UP_PIN, INPUT_PULLUP); // up button
   pinMode(BUTTON_SELECT_PIN, INPUT_PULLUP); // select button
   pinMode(BUTTON_DOWN_PIN, INPUT_PULLUP); // down button
-  
+  BUTTON_SELECT_PIN.attachDoubleClick(doubleclick);
   Serial.println("Starting WiFi scan...");
   WiFi.mode(WIFI_STA);
+
+
 
   SavedCredentials();
   animation();
@@ -896,15 +921,13 @@ void setup() {
 }
 
 
-
 void loop() {
   server.handleClient();
   int currentStationCount = WiFi.softAPgetStationNum();
   bool isConnected = WiFi.status() == WL_CONNECTED; 
-// save values for CD74HC4067 
+  // save values for CD74HC4067 
   int value0 = channel0();
   // Serial.println(value0);
-
 
 
   if (current_screen == 0) { // MENU SCREEN
@@ -929,17 +952,29 @@ void loop() {
         button_down_clicked = 0;
       }
   }
-  if ((digitalRead(BUTTON_SELECT_PIN) == LOW) && (button_select_clicked == 0)) { // select button clicked, jump between screens
-     button_select_clicked = 1; // 
-     if (current_screen == 0) { // menu items screen --> functions
-        current_screen = 1;
-      } 
-      else if (current_screen == 1  && item_selected == 1) {current_screen = 2;} //settings 
-     else {current_screen = 0;} // last screen --> menu items screen
-  }
-  if ((digitalRead(BUTTON_SELECT_PIN) == HIGH) && (button_select_clicked == 1)) { // unclick 
-    button_select_clicked = 0;
-  }
+      if ((digitalRead(BUTTON_SELECT_PIN) == LOW) && (button_select_clicked == 0)) { // select button clicked, jump between screens
+          button_select_clicked = 1;
+          if (current_screen == 0) { // menu items screen --> functions
+              current_screen = 1;
+          } 
+          else if (current_screen == 1 && item_selected == 1) {
+              current_screen = 2; // settings screen
+          }
+          else if (current_screen == 1 && item_selected == 0) { // additional condition
+              // Check for long press
+              if (millis() - button_press_time >= long_press_duration) {
+                  current_screen = 0; // Go back to menu items screen for long press
+              }
+          }
+          else {
+              current_screen = 0; // last screen --> menu items screen
+          }
+          // Update button press time
+          button_press_time = millis();
+      }
+      if ((digitalRead(BUTTON_SELECT_PIN) == HIGH) && (button_select_clicked == 1)) { // unclick 
+          button_select_clicked = 0;
+      }
   // set correct values for the previous and next items
   item_sel_previous = item_selected - 1;
   if (item_sel_previous < 0) {item_sel_previous = NUM_ITEMS - 1;} // previous item would be below first = make it the last
@@ -967,7 +1002,7 @@ void loop() {
       u8g2.drawBox(125, 64/NUM_ITEMS * item_selected, 3, 64/NUM_ITEMS); 
       u8g2.sendBuffer(); 
     } 
-    else if (current_screen == 1 and item_selected == 2) { // wifi
+    else if (current_screen == 1 && item_selected == 2) { // wifi
       int resetbutton = analogRead(reset);
     // check if wifi is interupted
       if (wasConnected && !isConnected) {
@@ -1011,7 +1046,7 @@ void loop() {
             sendDataPrevMillis = millis();
             int value0 = channel0();
             pressed = false;
-            if (Firebase.RTDB.setInt(&fbdo, "usr/12345/sensor_value/slot_1", value0)){
+            if (Firebase.RTDB.setInt(&fbdo, "sensor/slot-1", value0)){
               Serial.println();
               Serial.print(value0);
               Serial.print(" success: " );
@@ -1024,15 +1059,16 @@ void loop() {
               Serial.println(fbdo.errorReason());
             }
           }
-        // Update the the data 
       wasConnected = isConnected;
-
 }   
-    else if (current_screen == 1 && item_selected == 2){ //offline       
-    //  for offline function
 
+    else if (current_screen == 1 && item_selected == 0){ //offline 
+                  //  for offline function
+
+
+                  
 }
-    else if (current_screen == 1 && item_selected == 1){ //settings 
+    else if (current_screen == 1 && item_selected == 1){ //info 
       u8g2.setFont(u8g_font_6x10);   
       for (int i = 0; i < 6; ++i) {
         if (i < 6) {
@@ -1040,19 +1076,16 @@ void loop() {
         }
       }
 }
-    else if (current_screen == 2 && item_selected == 1){ //settings 
+    else if (current_screen == 2 && item_selected == 1){ //info 
       u8g2.setFont(u8g_font_6x10);   
       for (int i = 0; i < 6; ++i) {
         if (i < 6) {
             u8g2.drawStr(3, 12 + 10 * i, info[i]);  // Adjust vertical spacing accordingly
         }
       }
-
       // Send buffer to the display
       u8g2.sendBuffer();
-
-
 }
   u8g2.sendBuffer(); // send buffer from RAM to display controller
-
 }
+
