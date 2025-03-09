@@ -15,15 +15,15 @@
 #include <ArduinoJson.h>
 
 // Insert Firebase project API Key
-#define API_KEY "AIzaSyBmJ0ibz-8MF6HP7H3wJeKhxYx1Rwca17Y"
+#define API_KEY "AIzaSyCxB7bHd7kYxrY4GjC1kx3Mg6WbZlenEik"
 // Insert RTDB URLefine the RTDB URL 
-#define DATABASE_URL "https://mydoserx-app-default-rtdb.firebaseio.com/" 
+#define DATABASE_URL "https://mydoserx-app-c0999-default-rtdb.firebaseio.com/" 
+
 
 //Define Firebase Data object
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
-// Preferences
 Preferences preferences;
 
 //monitor 
@@ -32,29 +32,16 @@ ani myAni;
 int counter = 0; 
 
 // Define the control pins for the CD74HC4067
-#define S0 15
-#define S1 2
-#define S2 4
-#define S3 0
-#define SIG 36
-// button 
+
 // menu
 #define BUTTON_UP_PIN  32 // pin for UP button 
 #define BUTTON_SELECT_PIN  27// pin for SELECT button
 #define BUTTON_DOWN_PIN  34 // pin for DOWN button
-#define reset  27 // pin for DOWN button
 
-
-// stop
-const int stopButton = 33; 
-
-
-// Read analog value from GPIO 26 (ADC1 channel 9)
-int analogValue26 = analogRead(26);
-            
-    // Read analog value from GPIO 25 (ADC1 channel 8)
- int analogValue25 = analogRead(25);
-            
+#define BUZZER_PIN 25  // Define GPIO 25
+#define CHANNEL 0        // LEDC channel
+#define FREQ 2000        // Frequency in Hz (adjust for different tones)
+#define RESOLUTION 8     // 8-bit resolution
 
 
 // Wifi //
@@ -95,65 +82,7 @@ int demo_mode_delay = 0; // demo mode delay = used to slow down the screen switc
 #define NUM_LEDS 21 // How many leds in your strip?
 #define DATA_PIN 16
 CRGB leds[NUM_LEDS]; // Define the array of leds
-//time 
-const char* ntpServer = "asia.pool.ntp.org";
-const long  gmtOffset_sec = 8 * 3600; // Philippines is GMT +8
-const int   daylightOffset_sec = 0; // No daylight saving time in Philippines
 
-void setTime(){
-  struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-    return;
-  }
-
-  // Calculate the number of seconds until 5 AM
-  struct tm targetTime = timeinfo; // Copy current time structure
-  targetTime.tm_hour = 9; // Set target hour to 5 AM
-  targetTime.tm_min = 0; // Set target minutes to 0
-  targetTime.tm_sec = 0; // Set target seconds to 0
-
-  // Adjust for next day if current hour is past 5 AM
-  if(timeinfo.tm_hour >= 9){
-    targetTime.tm_mday += 1;
-  }
-
-  // Convert both current time and target time to time_t format
-  time_t currentTime_t = mktime(&timeinfo);
-  time_t targetTime_t = mktime(&targetTime);
-
-  // Calculate difference in seconds
-  double secondsUntilTarget = difftime(targetTime_t, currentTime_t);
-
-  // Calculate hours, minutes, and seconds from difference
-  int hours = int(secondsUntilTarget) / 3600;
-  int minutes = (int(secondsUntilTarget) % 3600) / 60;
-  int seconds = int(secondsUntilTarget) % 60;
-
-  // Display current date and time as before
-  String AM_PM = (timeinfo.tm_hour >= 12) ? "PM" : "AM";
-  
-   // Convert hour from the military (24-hour) format to the standard (12-hour) format for display purposes
-   int displayHour = timeinfo.tm_hour % 12;
-   if(displayHour == 0) displayHour = 12; // Convert '0' hour to '12' for readability
-
-   char dateStringBuff[50]; 
-   strftime(dateStringBuff, sizeof(dateStringBuff), "%B, %d, %Y", &timeinfo);
-   char timeStringBuff[50]; 
-   strftime(timeStringBuff, sizeof(timeStringBuff), "%I:%M:%S", &timeinfo);
-   
-   u8g2.setFont(u8g2_font_ncenB08_tr);
-   u8g2.drawStr(5,25,dateStringBuff);
-   u8g2.setCursor(5,35);
-   u8g2.print(timeStringBuff);
-   u8g2.print(" ");
-   u8g2.print(AM_PM.c_str());
-
-   // Display countdown timer
-   char countdownStringBuff[50];
-   sprintf(countdownStringBuff, "Countdown: %02d:%02d:%02d", hours, minutes, seconds);
-   u8g2.drawStr(5,45,countdownStringBuff); 
-}
 
 // scan wifi ssid
 void handleScanWiFi() {
@@ -436,153 +365,153 @@ void handleWiFiConnected() {
 // end website
 
 // start webserver
-void fireBase() {
-    config.api_key = API_KEY;
-    config.database_url = DATABASE_URL;
 
-    // Sign up 
-    if (Firebase.signUp(&config, &auth, "", "")){
-      Serial.println("ok");
-      signupOK = true;
-    }
-    else{
-      Serial.printf("%s\n", config.signer.signupError.message.c_str());
-    }
-    config.token_status_callback = tokenStatusCallback; 
-    Firebase.begin(&config, &auth);
-    Firebase.reconnectWiFi(true);
+void fireBase() {
+  config.api_key = API_KEY;
+  config.database_url = DATABASE_URL;
+
+  // Sign up 
+  if (Firebase.signUp(&config, &auth, "", "")){
+    Serial.println("ok");
+    signupOK = true;
+  }
+  else{
+    Serial.printf("%s\n", config.signer.signupError.message.c_str());
+  }
+  config.token_status_callback = tokenStatusCallback; 
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
 }
 
 void handleSubmit() {
-  if(server.method() == HTTP_POST) {
-    String SSID = server.arg("Wifi SSID");
-    String PASS = server.arg("Password");
-    Serial.print("SSID: ");
-    Serial.println(SSID);
-    Serial.print("PASS: ");
-    Serial.println(PASS);
+if(server.method() == HTTP_POST) {
+  String SSID = server.arg("Wifi SSID");
+  String PASS = server.arg("Password");
+  Serial.print("SSID: ");
+  Serial.println(SSID);
+  Serial.print("PASS: ");
+  Serial.println(PASS);
 
-    preferences.begin("credentials", false);
-    preferences.putString("ssid", SSID);
-    preferences.putString("pass", PASS);
-    preferences.end();
+  preferences.begin("credentials", false);
+  preferences.putString("ssid", SSID);
+  preferences.putString("pass", PASS);
+  preferences.end();
 
-    WiFi.begin(SSID.c_str(), PASS.c_str());
-    unsigned long startMillis = millis();  
-    while (WiFi.status() != WL_CONNECTED) {
-      if (millis() - startMillis >= 15000) {  //  If 10 seconds have passed
-        Serial.println("Failed to connect to WiFi after 15 seconds.");
-        server.sendHeader("Location", "/error", true);
-        server.send(302, "text/plain", "");
-        break;
-      }
-      Serial.print(".");
-      delay(300);
-    } 
-    if (WiFi.status() == WL_CONNECTED) {
-      clearDisplayQR = false;
-      Serial.println();
-      Serial.println("handleSubmit");
-      Serial.print("Connected with IP: ");
-      Serial.println(WiFi.localIP());
-      handleWiFiConnected();
-      fireBase();
-    } else {
-      Serial.println("Incorrect password or SSID. Re-scanning networks.");
-      handleScanWiFi();  // Call handleScanWiFi to rescan networks
+  WiFi.begin(SSID.c_str(), PASS.c_str());
+  unsigned long startMillis = millis();  
+  while (WiFi.status() != WL_CONNECTED) {
+    if (millis() - startMillis >= 15000) {  //  If 10 seconds have passed
+      Serial.println("Failed to connect to WiFi after 15 seconds.");
+      server.sendHeader("Location", "/error", true);
+      server.send(302, "text/plain", "");
+      break;
     }
+    Serial.print(".");
+    delay(300);
+  } 
+  if (WiFi.status() == WL_CONNECTED) {
+    clearDisplayQR = false;
+    Serial.println();
+    Serial.println("handleSubmit");
+    Serial.print("Connected with IP: ");
+    Serial.println(WiFi.localIP());
+    handleWiFiConnected();
+    fireBase();
+  } else {
+    Serial.println("Incorrect password or SSID. Re-scanning networks.");
+    handleScanWiFi();  // Call handleScanWiFi to rescan networks
   }
+}
 }
 
 void webServerStart(){
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  WiFi.softAP(ssid, password);
-  Serial.println();
-  Serial.print("Access Point \"");
-  Serial.print(ssid);
-  Serial.println("\" started");
-  IPAddress IP = WiFi.softAPIP();
-  Serial.print("IP Address: ");
-  Serial.println(IP);
+WiFi.mode(WIFI_STA);
+WiFi.disconnect();
+WiFi.softAP(ssid, password);
+Serial.println();
+Serial.print("Access Point \"");
+Serial.print(ssid);
+Serial.println("\" started");
+IPAddress IP = WiFi.softAPIP();
+Serial.print("IP Address: ");
+Serial.println(IP);
 // Set up server routes
 
-    // Set up server routes
-    server.on("/", handleRoot);
-    server.on("/submit", HTTP_POST, handleSubmit);
-    server.on("/error", handleError); // Handle errors
-    server.on("/scanwifi", HTTP_GET, handleScanWiFi); // Use handleScanWiFi for /scanwifi
+  // Set up server routes
+  server.on("/", handleRoot);
+  server.on("/submit", HTTP_POST, handleSubmit);
+  server.on("/error", handleError); // Handle errors
+  server.on("/scanwifi", HTTP_GET, handleScanWiFi); // Use handleScanWiFi for /scanwifi
 
-  server.onNotFound([]() {
-    server.send(404, "text/plain", "404: Not found");
-  });
+server.onNotFound([]() {
+  server.send(404, "text/plain", "404: Not found");
+});
 
 // Start server
-  server.begin();
-  Serial.println("HTTP server started");  
+server.begin();
+Serial.println("HTTP server started");  
 // clear wifi cred
-  preferences.begin("credentials", false);
-  preferences.clear();
-  preferences.end();
-  WiFi.disconnect(); 
+preferences.begin("credentials", false);
+preferences.clear();
+preferences.end();
+WiFi.disconnect(); 
 }
 
 void SavedCredentials(){
-    preferences.begin("credentials", false);
-    String savedSSID = preferences.getString("ssid");
-    String savedPASS = preferences.getString("pass");
-    preferences.end();
+  preferences.begin("credentials", false);
+  String savedSSID = preferences.getString("ssid");
+  String savedPASS = preferences.getString("pass");
+  preferences.end();
 
-    Serial.println();
-    Serial.println("trying connecting to saved credentials .........");
-    Serial.println(savedSSID);
-    Serial.println(savedPASS);
+  Serial.println();
+  Serial.println("trying connecting to saved credentials .........");
+  Serial.println(savedSSID);
+  Serial.println(savedPASS);
 
-    u8g2.clearBuffer();
+  u8g2.clearBuffer();
 
-    WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
-    unsigned long startMillis = millis();  
-    while (WiFi.status() != WL_CONNECTED) {
-      if (savedSSID == "" || savedPASS == "" or millis() - startMillis >= 15000){
-        webServerStart();
-        break;
-      }
-      Serial.print(".");
-      delay(300);
+  WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
+  unsigned long startMillis = millis();  
+  while (WiFi.status() != WL_CONNECTED) {
+    if (savedSSID == "" || savedPASS == "" or millis() - startMillis >= 15000){
+      webServerStart();
+      break;
+    }
+    Serial.print(".");
+    delay(300);
 
-    } 
-    if (WiFi.status() == WL_CONNECTED) {
-      clearDisplayQR = false;
-      Serial.println();
-      Serial.print("Connected with IP: ");
-      Serial.println(WiFi.localIP());
-      handleWiFiConnected();
-      fireBase();
-      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-      setTime();
   } 
+  if (WiFi.status() == WL_CONNECTED) {
+    clearDisplayQR = false;
+    Serial.println();
+    Serial.print("Connected with IP: ");
+    Serial.println(WiFi.localIP());
+    handleWiFiConnected();
+    fireBase();
+
+} 
 }
 
 void checkAndReconnectWiFi() {
-  if (WiFi.status() != WL_CONNECTED && !reconnectAttempted) {
-    Serial.println("WiFi is disconnected. Trying to reconnect...");
-    SavedCredentials(); // Try to reconnect using saved credentials
-    reconnectAttempted = true;
-    userConnectedToESP = false;
-    messageDisplayed = false;
+if (WiFi.status() != WL_CONNECTED && !reconnectAttempted) {
+  Serial.println("WiFi is disconnected. Trying to reconnect...");
+  SavedCredentials(); // Try to reconnect using saved credentials
+  reconnectAttempted = true;
+  userConnectedToESP = false;
+  messageDisplayed = false;
 
-    u8g2.clearBuffer();
+  u8g2.clearBuffer();
 
-    // Check if reconnection was successful
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("Reconnected successfully!");
-      clearDisplayQR = false;
-    } else {
-      Serial.println("Reconnection failed. Please enter new SSID/PASS.");
-    }
-    // Reset the flag after the reconnection process
-    reconnectAttempted = false;
+  // Check if reconnection was successful
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Reconnected successfully!");
+    clearDisplayQR = false;
+  } else {
+    Serial.println("Reconnection failed. Please enter new SSID/PASS.");
   }
+  // Reset the flag after the reconnection process
+  reconnectAttempted = false;
+}
 }
 
 const char* messages[] = {
@@ -615,25 +544,6 @@ void animation(){
       break;
     }
   }
-}
-
-// sensor value 
-void selectMuxChannel(int channel) {
-  digitalWrite(S0, bitRead(channel, 0));
-  digitalWrite(S1, bitRead(channel, 1));
-  digitalWrite(S2, bitRead(channel, 2));
-  digitalWrite(S3, bitRead(channel, 3));
-}
-
-int channel0() {
-    selectMuxChannel(0);
-    int analogValue = analogRead(SIG);
-    return analogValue;
-    // if(analogValue > 350){
-    //   return true;
-    // } else{
-    //   return false;
-    // }
 }
 
 const unsigned char epd_bitmap_scan_to_connect [] PROGMEM = {
@@ -851,31 +761,84 @@ char menu_items [NUM_ITEMS] [MAX_ITEM_LENGTH] = {  // array with item names
   { "online" },
  };
 
-void timeToDrink(){
-    u8g2.clearBuffer();
-    u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
-    u8g2.drawStr(5,25,"time to drink:");
-    u8g2.drawStr(5,35,"time to drink");
-    // u8g2.print(" ");
-    // u8g2.print("biogesic"); //name of the med
-    u8g2.sendBuffer(); 
+
+ String getFirebaseString(String path, bool toUpperCase = false) {
+  if (Firebase.RTDB.getString(&fbdo, path)) { 
+      if (fbdo.dataType() == "string") {
+          String data = fbdo.stringData();
+
+          // Remove unwanted characters
+          data.replace("\"", "");  // Remove extra quotes
+          data.replace("\\", "");  // Remove backslashes
+          data.replace("-", "");   // Remove dashes (if any)
+
+          // Convert to uppercase if needed
+          if (toUpperCase) {
+              data.toUpperCase();
+          }
+
+          Serial.print("Fetched Data: ");
+          Serial.println(data);
+          return data;
+      }
+  } else {
+      Serial.println("FAILED");
+      Serial.print("REASON: ");
+      Serial.println(fbdo.errorReason());
+  }
+  return "";
 }
 
-String  firstName(){
-if (Firebase.RTDB.getString(&fbdo, "Data/firstName")) {
-  if (fbdo.dataType() == "string") {
-    String firstName = fbdo.stringData();
-    firstName.toUpperCase();
-    Serial.print("First Name: ");
-    Serial.println(firstName);
-    return firstName;
+
+void displayOnOLED(String name, String time, String date, String med, String dose, String medTime) {
+  
+  String timer = getFirebaseString("Buzzer/buzzerValue", true);
+
+  u8g2.clearBuffer();                   
+  u8g2.setFont(u8g2_font_6x10_tf);       
+
+  u8g2.drawStr(3, 10, time.c_str());     
+  u8g2.drawStr(90, 10, date.c_str());     
+
+  u8g2.drawStr(3, 27, "hello ");          
+  u8g2.drawStr(36, 27, name.c_str());    
+
+  u8g2.drawStr(3, 37, "Medicine: ");    
+  u8g2.drawStr(60, 37, med.c_str());    
+
+  u8g2.drawStr(3, 47, "Dose: ");    
+  u8g2.drawStr(36, 47, dose.c_str());    
+
+  u8g2.drawStr(3, 57, "intake time: ");   
+
+  u8g2.sendBuffer();     
+
+  if (timer == "1"){
+    // Play tone
+    ledcWriteTone(CHANNEL, 1000); 
+    delay(250);  
+    ledcWriteTone(CHANNEL, 0);  // Stop sound
+    delay(250);  
+    u8g2.drawStr(75, 57, "NOW");    
+
+  }else{
+    ledcWriteTone(CHANNEL, 0);  // Stop sound
+    u8g2.drawStr(75, 58, medTime.c_str());    
+
+  }                
 }
-  } else {
-    Serial.print("FAILED");
-    Serial.print("REASON: ");
-    Serial.println(fbdo.errorReason());
-}
-return "";
+
+void sendSensorData() {
+  int cell11 = analogRead(33);
+  int cell12 = analogRead(36);
+  int cell13 = analogRead(39);
+  int cell14 = analogRead(35);
+
+  // Send data to Firebase
+  Firebase.RTDB.setInt(&fbdo, "sensorValues/cell1", cell11);
+  Firebase.RTDB.setInt(&fbdo, "sensorValues/cell2", cell12);
+  Firebase.RTDB.setInt(&fbdo, "sensorValues/cell3", cell13);
+  Firebase.RTDB.setInt(&fbdo, "sensorValues/cell4", cell14);
 }
 
 void setup() {
@@ -883,13 +846,6 @@ void setup() {
   u8g2.begin();
   u8g2.setColorIndex(1);  
   u8g2.setBitmapMode(1);
-  FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
-  // CD74HC4067
-  pinMode(S0, OUTPUT);
-  pinMode(S1, OUTPUT);
-  pinMode(S2, OUTPUT);
-  pinMode(S3, OUTPUT);
-  pinMode(SIG, INPUT);
 
   pinMode(BUTTON_UP_PIN, INPUT_PULLUP); // up button
   pinMode(BUTTON_SELECT_PIN, INPUT_PULLUP); // select button
@@ -897,23 +853,25 @@ void setup() {
   
   Serial.println("Starting WiFi scan...");
   WiFi.mode(WIFI_STA);
-
+  u8g2.setDisplayRotation(U8G2_R2);
   SavedCredentials();
   animation();
+
+  // Configure PWM channel
+  ledcSetup(CHANNEL, FREQ, RESOLUTION);
+  ledcAttachPin(BUZZER_PIN, CHANNEL);
 
 }
 
 
-
 void loop() {
+
+
+
+
   server.handleClient();
   int currentStationCount = WiFi.softAPgetStationNum();
   bool isConnected = WiFi.status() == WL_CONNECTED; 
-// save values for CD74HC4067 
-  int value0 = channel0();
-  // Serial.println(value0);
-
-
 
   if (current_screen == 0) { // MENU SCREEN
       if ((digitalRead(BUTTON_UP_PIN) == LOW) && (button_up_clicked == 0)) { // up button clicked - jump to previous menu item
@@ -977,6 +935,7 @@ void loop() {
     } 
     else if (current_screen == 1 and item_selected == 2) { // wifi
 
+
     // check if wifi is interupted
       if (wasConnected && !isConnected) {
         Serial.println("Internet connection was interrupted.");
@@ -992,70 +951,43 @@ void loop() {
       } 
       else if (currentStationCount < 1 && WiFi.status() != WL_CONNECTED){
             Serial.println("user has not connected to the ESP32 WiFi.");
+
             u8g2.drawXBMP(0, 0, 128, 64, epd_bitmap_scan_to_connect);
       }   
-      if (BUTTON_SELECT_PIN == 1 && WiFi.status() == WL_CONNECTED){
-        Serial.print("network dissconnected");
-        Serial.print(" button value: ");
-        Serial.println(BUTTON_SELECT_PIN);
-        preferences.begin("credentials", false);
-        preferences.clear();
-        preferences.end();
-        WiFi.disconnect();
-        // pressed = true;
-      }else if (WiFi.status() == WL_CONNECTED){
-
-            struct tm timeinfo;
-            u8g2.drawXBMP(0, 0, 20, 16, epd_bitmap_wifi);
-            setTime();   
-            u8g2.setCursor(5,55);
-            u8g2.print("hello! ");
-            u8g2.print(firstName().c_str()); 
-            u8g2.sendBuffer();
-
-        if(Firebase.ready() && signupOK && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0 )){
-            sendDataPrevMillis = millis();
-            int value0 = channel0();
-            pressed = false;
-            if (Firebase.RTDB.setInt(&fbdo, "sensor/slot_1", analogValue26)){
-              Serial.println();
-              Serial.print(value0);
-              Serial.print(" success: " );
-              Serial.print(fbdo.dataPath());
-              Serial.print(" TYPE: " );
-              Serial.println(fbdo.dataType());
-            }else {
-              Serial.print("FAILED");
-              Serial.print("REASON: " );
-              Serial.println(fbdo.errorReason());
-            }
-        
-            if (Firebase.RTDB.setInt(&fbdo, "sensor/slot_2", analogValue25)){
-              Serial.println();
-              Serial.print(value0);
-              Serial.print(" success: " );
-              Serial.print(fbdo.dataPath());
-              Serial.print(" TYPE: " );
-              Serial.println(fbdo.dataType());
-            }else {
-              Serial.print("FAILED");
-              Serial.print("REASON: " );
-              Serial.println(fbdo.errorReason());
-            }
-          
+      // if ( WiFi.status() == WL_CONNECTED){
+      //   Serial.print("network dissconnected");
+      //   preferences.begin("credentials", false);
+      //   preferences.clear();
+      //   preferences.end();
+      //   WiFi.disconnect();
+      //   // pressed = true;
+      // }        
+      else if (digitalRead(BUTTON_SELECT_PIN) == HIGH and WiFi.status() == WL_CONNECTED){
+        button_select_clicked = 0;
       }
 
-      
-          
+      else if (WiFi.status() == WL_CONNECTED){
+        String newUser = getFirebaseString("UserList/Users", true);  // Convert to uppercase
+        String nowtime = getFirebaseString("Time/currentTime");      // No uppercase conversion
+        String date = getFirebaseString("Time/currentDay");      // No uppercase conversion
+        String meds = getFirebaseString("MedicationList/medName");
+        String doses = getFirebaseString("MedicationList/dose", true);
+        String intaketime = getFirebaseString("MedicationList/medTime", true);        
+
+        
+
+        displayOnOLED(newUser, nowtime, date, meds, doses, intaketime);  // Show both on OLED
+        
+
+        
+      }  
         // Update the the data 
       wasConnected = isConnected;
-
 }   
     else if (current_screen == 1 && item_selected == 0){ //offline  
-    u8g2.setFont(u8g_font_6x10);   
-    u8g2.drawStr(3, 12, "Offline");
-    u8g2.drawStr(3, 24, "Comming soon");
-    u8g2.sendBuffer();
+
+
+
 }
     else if (current_screen == 1 && item_selected == 1){ //settings 
       u8g2.setFont(u8g_font_6x10);   
@@ -1080,4 +1012,4 @@ void loop() {
 }
   u8g2.sendBuffer(); // send buffer from RAM to display controller
 
-}}
+}
